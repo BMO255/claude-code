@@ -321,6 +321,7 @@ function musicTick(){
   if (!AC || !curSong) return;
   const song = parsedSongs[curSong];
   const stepDur = 30 / song.bpm; // 8th note
+  if (nextStepT < AC.currentTime - 0.1) nextStepT = AC.currentTime + 0.05; // re-anchor after tab throttling
   while (nextStepT < AC.currentTime + 0.15){
     const t0 = nextStepT;
     for (const tr of song.tracks){
@@ -1154,7 +1155,7 @@ const ROOMS = {
       { x:0, y:0, w:640, h:52 }, { x:0, y:186, w:640, h:14 },
       { x:0, y:0, w:10, h:82 }, { x:0, y:138, w:10, h:62 },
       { x:630, y:0, w:10, h:82 }, { x:630, y:138, w:10, h:62 },
-      { x:200, y:52, w:26, h:60 }, { x:420, y:110, w:26, h:76 }
+      { x:200, y:52, w:26, h:60 }, { x:420, y:118, w:26, h:68 }
     ],
     deco(){
       ctx.fillStyle = "#332f26"; ctx.fillRect(0, 0, 640, 52);
@@ -2047,9 +2048,11 @@ function doSpare(e){
     SFX.spare();
     for (let i = 0; i < 16; i++)
       B.fx.push({ x:e.x + rnd(-16, 16), y:e.y + rnd(-16, 16), vx:rnd(-0.5, 0.5), vy:rnd(-1.2, -0.2), t:irnd(20, 40), col:"#ffe14a", kind:"spark" });
-    if (e.defId === "kongy" && G.inv.length < 8){ G.inv.push("cheese"); }
     B.msg = e.spareText;
-    if (e.defId === "glacion"){ B.msg = e.spareText; }
+    if (e.defId === "kongy"){
+      if (G.inv.length < 8) G.inv.push("cheese");
+      else B.msg = "KONGY OFFERS A CHEESE WHEEL, BUT YOUR POCKETS ARE FULL. HE NODS. THE RESPECT REMAINS.";
+    }
   } else {
     B.msg = e.mercy > 0 || e.soft || e.sniffed
       ? `${e.name} IS ALMOST THERE. KEEP AT IT!`
@@ -2144,10 +2147,10 @@ function startVictory(){
   setState("victory");
 }
 function startEnemyTurn(){
-  // boss scripted dialogue first if queued
+  // boss scripted dialogue first if queued (drain fully, in order)
   if (B.bossDlgQueue.length){
     const script = B.bossDlgQueue.shift();
-    say(script, () => { enemyBubble(); });
+    say(script, () => { startEnemyTurn(); });
     return;
   }
   enemyBubble();
@@ -2216,15 +2219,15 @@ function updateBullets(){
       if (b.x < B.box.x + b.r || b.x > B.box.x + B.box.w - b.r){ b.vx *= -1; b.x = clamp(b.x, B.box.x + b.r, B.box.x + B.box.w - b.r); }
       if (b.y < B.box.y + b.r || b.y > B.box.y + B.box.h - b.r){ b.vy *= -1; b.y = clamp(b.y, B.box.y + b.r, B.box.y + B.box.h - b.r); }
     }
-    // graze + hit
+    // graze + hit (short spawn grace so emitter-adjacent spawns can't cheap-shot or farm TP)
     const d = Math.hypot(s.x - b.x, s.y - b.y);
-    if (d < b.r + 3){
+    if (b.t >= 8 && d < b.r + 3){
       if (s.inv <= 0){
         s.inv = 60;
         const dmg = b.dmg + irnd(0, 2);
         applyPartyDamage(dmg);
       }
-    } else if (d < b.r + 12 && !b.grazed){
+    } else if (b.t >= 6 && d < b.r + 12 && !b.grazed){
       b.grazed = true;
       G.tp = clamp(G.tp + 2.5, 0, 100);
       SFX.graze();
@@ -2347,7 +2350,14 @@ function finishBattle(won){
   G.invuln = 100;
   G.party.forEach(p => { if (p.hp <= 0) p.hp = 1; });
   playMusic(ROOMS[G.roomId].music);
-  if (won && wasBoss) setTimeout(() => { if (G.mode === "world" && !G.dialog) say(postBossScript()); }, 400);
+  if (won && wasBoss){
+    const tryPost = () => {
+      if (G.flags.gotRolls || G.mode === "title" || G.mode === "end" || G.mode === "gameover") return;
+      if (G.mode === "world" && !G.dialog && !G.menu){ say(postBossScript()); return; }
+      setTimeout(tryPost, 300);
+    };
+    setTimeout(tryPost, 400);
+  }
 }
 
 // ---- battle render ----
@@ -2417,7 +2427,7 @@ function drawBattle(){
     if (held.x){ ctx.fillStyle = "rgba(255,255,255,0.8)"; ctx.fillRect(s.x - 1, s.y - 1, 2, 2); }
     if (B.tutHintT > 0){
       B.tutHintT--;
-      drawTextC("DODGE! GRAZE CLOSE TO BULLETS FOR TP!", 160, bx.y + bx.h + 14, "#ffe14a");
+      drawTextC("DODGE! GRAZE CLOSE TO BULLETS FOR TP!", 160, bx.y - 12, "#ffe14a");
     }
   } else if (B.state === "fightbar"){
     const left = bx.x - 10, right = bx.x + bx.w + 10;
@@ -2454,17 +2464,17 @@ function drawBattle(){
   }
   if (B.state === "list"){
     const list = listItems();
-    drawBox(88, 92, 150, 18 + Math.max(1, list.length) * 11);
-    const title = { MAGIC:"MAGIC (TP)", ITEM:"ITEMS", ACT2:"ACT HOW?", ALLY:"USE ON WHO?" }[B.listKind] || "";
-    drawText(title, 96, 96, "#8a93a8");
+    drawBox(88, 70, 150, 18 + Math.max(1, list.length) * 11);
+    const title = { MAGIC:"MAGIC (TP)", ITEM:"ITEMS", ACT2:"ACT HOW?", ALLY:"USE ON WHO?", HEALALLY:"HEAL WHO?" }[B.listKind] || "";
+    drawText(title, 96, 74, "#8a93a8");
     list.forEach((it, i) => {
       let col = i === B.subSel ? "#ffffff" : "#9aa2b8";
       if (B.listKind === "MAGIC" && G.tp < it.s.cost) col = "#5a5f72";
-      drawText(it.label, 108, 107 + i * 11, col);
-      if (i === B.subSel) ctx.drawImage(soulSpr, 98, 108 + i * 11);
+      drawText(it.label, 108, 85 + i * 11, col);
+      if (i === B.subSel) ctx.drawImage(soulSpr, 98, 86 + i * 11);
     });
     if (B.listKind === "MAGIC" && list[B.subSel])
-      drawText(list[B.subSel].s.desc, 12, 62, "#8a93a8");
+      drawText(list[B.subSel].s.desc, 12, 52, "#8a93a8");
   }
 
   // fx
@@ -2587,7 +2597,7 @@ function bossIntroScript(){
     { p:"mega", name:"MEGAFIRE", t:"(PSST. THIS GUY IS NOT OKAY.)" },
     { p:"bmo", name:"BMO", t:"(SHH. WE'LL UNPACK IT IN BATTLE.)" },
     { p:"glacion", name:"KING GLACION", t:"FACE THE COLD!!" },
-    { fn(){ startBattle("boss", null); }, t:"" }
+    { fn(){ startBattle("boss", null); }, t:"THE AIR ITSELF FREEZES OVER!!" }
   ];
 }
 function postBossScript(){
@@ -2668,7 +2678,13 @@ function drawGameOver(){
 }
 
 // ================= TITLE =================
-function gotoTitle(){ G.mode = "title"; G.titleSel = 0; playMusic("town"); }
+function gotoTitle(){
+  G.mode = "title"; G.titleSel = 0; playMusic("town");
+  try {
+    const d = JSON.parse(localStorage.getItem("fridgequest"));
+    if (d && d.flags && d.flags.gotRolls) G.flags.gotRolls = 1;
+  } catch (e) {}
+}
 function titleOptions(){ return hasSave() ? ["CONTINUE", "NEW GAME"] : ["NEW GAME"]; }
 function updateTitle(){
   const opts = titleOptions();
