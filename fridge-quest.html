@@ -763,6 +763,27 @@ const shrineSpr = S([
 "..mmmmmmmmmmmm..",
 ], { m:"#8ca8c0", I:"#c8e8f8" });
 
+// item chests (closed / opened)
+const chestPal = { b:"#8a6a3c", d:"#b08a4c", y:"#ffe14a", k:"#241c10" };
+const chestClosed = S([
+"..bbbbbbbb..",
+".bddddddddb.",
+".bddddddddb.",
+".bbbbbbbbbb.",
+".bdddyydddb.",
+".bddddddddb.",
+".bbbbbbbbbb.",
+], chestPal);
+const chestOpen = S([
+"..bbbbbbbb..",
+".bkkkkkkkkb.",
+".bkkkkkkkkb.",
+".bbbbbbbbbb.",
+".bddddddddb.",
+".bddddddddb.",
+".bbbbbbbbbb.",
+], chestPal);
+
 // soul heart (battle cursor)
 const soulSpr = S([
 ".rr.rr.",
@@ -1067,7 +1088,7 @@ const ROOMS = {
       { id:"sign1", x:120, y:100, spr:null, w:16, h:12, sign:true, name:"",
         dlg(){ return [{ t:"WELCOME TO THE COLD WORLD. MIND THE GAP. MIND THE MOLD. MIND YOUR MANNERS." }]; } }
     ],
-    saves: [], exits: [ { x:312, y:96, w:8, h:56, to:"village", tx:24, ty:150 } ],
+    saves: [], exits: [ { x:312, y:96, w:8, h:56, to:"village", tx:24, ty:150, dir:"right" } ],
     spawns: [
       { id:"tut_gherkin", x:262, y:120, spr:gherkinSpr, group:"tut",
         patrol:{ axis:"y", range:24, spd:0.025 }, flag:"tutorialDone" }
@@ -1143,9 +1164,108 @@ const ROOMS = {
     ],
     saves: [ { x:280, y:190 } ],
     exits: [
-      { x:0, y:120, w:8, h:56, to:"landing", tx:290, ty:124 },
-      { x:552, y:120, w:8, h:56, to:"shelf", tx:26, ty:110 }
+      { x:0, y:120, w:8, h:56, to:"landing", tx:290, ty:124, dir:"left" },
+      { x:552, y:120, w:8, h:56, to:"shelf", tx:26, ty:110, dir:"right" },
+      { x:97, y:116, w:18, h:8, to:"jarhome1", tx:110, ty:140, dir:"up" },
+      { x:257, y:116, w:18, h:8, to:"jarhome2", tx:110, ty:140, dir:"up" },
+      { x:427, y:116, w:18, h:8, to:"bakeryin", tx:110, ty:140, dir:"up" }
     ],
+    spawns: []
+  },
+  jarhome1: {
+    w: 220, h: 170, music: "town", dark: false,
+    floor: "#86704a",
+    walls: [
+      { x:0, y:0, w:220, h:44 }, { x:0, y:0, w:10, h:170 }, { x:210, y:0, w:10, h:170 },
+      { x:0, y:160, w:90, h:10 }, { x:130, y:160, w:90, h:10 },
+      { x:120, y:44, w:44, h:26 }  // table
+    ],
+    deco(){
+      jarInterior("#8fb0cc");
+      // knitting basket + table
+      ctx.fillStyle = "#5c4a2e"; ctx.fillRect(120, 48, 44, 22);
+      ctx.fillStyle = "#7a6240"; ctx.fillRect(124, 52, 36, 14);
+      ctx.fillStyle = "#c87878"; ctx.fillRect(130, 55, 10, 8);
+      ctx.fillStyle = "#78a0c8"; ctx.fillRect(146, 55, 10, 8);
+      drawText("GRANNY'S JAR", 74, 20, "#2e3c52");
+    },
+    npcs: [
+      { id:"granny", x:70, y:100, spr:gherkinSpr, w:12, h:12, solid:true, name:"GRANNY GHERKA",
+        dlg(n){
+          if (n % 3 === 0) return [{ t:"GRANNY GHERKA: OH! VISITORS! SIT DOWN, SIT DOWN. MIND THE BRINE PUDDLES, DEARS." }];
+          if (n % 3 === 1) return [{ t:"GRANNY GHERKA: THE SPEAR? THAT'S MY KNITTING NEEDLE, DEAR. I KNIT LITTLE SWEATERS FOR THE COLD CUTS." }];
+          return [{ t:"GRANNY GHERKA: YOU KIDS WITH YOUR CRISPER DRAWERS AND YOUR FANCY RANCH DIPS... IN MY DAY WE HAD VINEGAR, AND WE LIKED IT." }];
+        } },
+      { id:"chest_j1", x:40, y:70, chest:true, item:"juice", flag:"chest_j1", w:12, h:10,
+        dlg(){ return chestDlg("juice", "chest_j1"); } }
+    ],
+    saves: [],
+    exits: [ { x:92, y:164, w:36, h:6, to:"village", tx:106, ty:131, dir:"down" } ],
+    spawns: []
+  },
+  jarhome2: {
+    w: 220, h: 170, music: "town", dark: false,
+    floor: "#86704a",
+    walls: [
+      { x:0, y:0, w:220, h:44 }, { x:0, y:0, w:10, h:170 }, { x:210, y:0, w:10, h:170 },
+      { x:0, y:160, w:90, h:10 }, { x:130, y:160, w:90, h:10 },
+      { x:30, y:44, w:56, h:22 }  // soup pot counter
+    ],
+    deco(){
+      jarInterior("#c8a0a0");
+      // the eternal soup pot
+      ctx.fillStyle = "#4a4436"; ctx.fillRect(30, 44, 56, 20);
+      ctx.fillStyle = "#6a6250"; ctx.fillRect(34, 40, 48, 10);
+      ctx.fillStyle = "#8a4a3c"; ctx.fillRect(40, 42, 36, 6);
+      drawText("TOMATO HOME", 76, 20, "#523232");
+    },
+    npcs: [
+      { id:"matomato", x:150, y:100, spr:tomatoSpr, w:10, h:10, solid:true, name:"MA TOMATO",
+        dlg(n){
+          if (n % 3 === 0) return [{ t:"MA TOMATO: TERRY AND JERRY ARE MY BOYS. ONE INSISTS HE'S A VEGETABLE. WE LOVE HIM ANYWAY." }];
+          if (n % 3 === 1) return [{ t:"MA TOMATO: DINNER'S AT SIX. IT'S SOUP. WE DON'T ASK WHAT KIND OF SOUP. NOBODY ASKS." }];
+          return [{ t:"MA TOMATO: YOU LOOK HUNGRY. EVERYONE WHO COMES IN HERE LOOKS HUNGRY. IT'S A FRIDGE THING." }];
+        } },
+      { id:"chest_j2", x:180, y:70, chest:true, item:"crust", flag:"chest_j2", w:12, h:10,
+        dlg(){ return chestDlg("crust", "chest_j2"); } }
+    ],
+    saves: [],
+    exits: [ { x:92, y:164, w:36, h:6, to:"village", tx:266, ty:131, dir:"down" } ],
+    spawns: []
+  },
+  bakeryin: {
+    w: 220, h: 170, music: "town", dark: false,
+    floor: "#7a5a3c",
+    walls: [
+      { x:0, y:0, w:220, h:44 }, { x:0, y:0, w:10, h:170 }, { x:210, y:0, w:10, h:170 },
+      { x:0, y:160, w:90, h:10 }, { x:130, y:160, w:90, h:10 },
+      { x:150, y:44, w:56, h:30 }  // oven
+    ],
+    deco(){
+      jarInterior("#c8b088");
+      // decorative oven with a warm (steady) glow
+      ctx.fillStyle = "#3a322a"; ctx.fillRect(150, 36, 56, 38);
+      ctx.fillStyle = "#241f1a"; ctx.fillRect(158, 46, 40, 22);
+      const gl = 0.6 + 0.15 * Math.sin(G.t / 40);
+      ctx.globalAlpha = gl; ctx.fillStyle = "#e08a30"; ctx.fillRect(162, 50, 32, 14); ctx.globalAlpha = 1;
+      // bread shelf
+      ctx.fillStyle = "#5c4a2e"; ctx.fillRect(24, 30, 70, 8);
+      ctx.fillStyle = "#d8a45c";
+      [28, 46, 64, 80].forEach(x => ctx.fillRect(x, 22, 12, 8));
+      drawText("ZE BAKERY", 82, 20, "#4a3a24");
+    },
+    npcs: [
+      { id:"croissant", x:60, y:100, spr:baguetteSpr, w:12, h:12, solid:true, name:"CROISSANT",
+        dlg(n){
+          if (n % 3 === 0) return [{ t:"CROISSANT: I AM CROISSANT, ZE COUSIN. I ALSO DID CRIMES. FLAKY CRIMES. BUTTER LAUNDERING." }];
+          if (n % 3 === 1) return [{ t:"CROISSANT: ZE OVEN IS DECORATIVE. WE LIVE IN A FRIDGE. ZE IRONY, IT BAKES US ALL." }];
+          return [{ t:"CROISSANT: MY COUSIN SELLS ZE BREAD OUT FRONT. I JUST STAND HERE, BEING A LITTLE MOON OF PASTRY." }];
+        } },
+      { id:"chest_bk", x:180, y:100, chest:true, item:"bread", flag:"chest_bk", w:12, h:10,
+        dlg(){ return chestDlg("bread", "chest_bk"); } }
+    ],
+    saves: [],
+    exits: [ { x:92, y:164, w:36, h:6, to:"village", tx:436, ty:131, dir:"down" } ],
     spawns: []
   },
   shelf: {
@@ -1178,8 +1298,8 @@ const ROOMS = {
     ],
     saves: [],
     exits: [
-      { x:0, y:82, w:8, h:56, to:"village", tx:526, ty:148 },
-      { x:632, y:82, w:8, h:56, to:"freezer", tx:26, ty:150 }
+      { x:0, y:82, w:8, h:56, to:"village", tx:526, ty:148, dir:"left" },
+      { x:632, y:82, w:8, h:56, to:"freezer", tx:26, ty:150, dir:"right" }
     ],
     spawns: [
       { id:"shelf_egg", x:300, y:130, spr:eggbertSpr, group:"shelf1",
@@ -1229,8 +1349,8 @@ const ROOMS = {
     ],
     saves: [ { x:70, y:170 } ],
     exits: [
-      { x:0, y:120, w:8, h:56, to:"shelf", tx:606, ty:110 },
-      { x:552, y:120, w:8, h:56, to:"throne", tx:30, ty:150 }
+      { x:0, y:120, w:8, h:56, to:"shelf", tx:606, ty:110, dir:"left" },
+      { x:552, y:120, w:8, h:56, to:"throne", tx:30, ty:150, dir:"right" }
     ],
     spawns: [
       { id:"fz_onion", x:180, y:120, spr:onionSpr, group:"freezer1",
@@ -1273,7 +1393,7 @@ const ROOMS = {
         dlg(){ return endingScript(); } }
     ],
     saves: [ { x:60, y:190 } ],
-    exits: [ { x:0, y:100, w:8, h:56, to:"freezer", tx:526, ty:148 } ],
+    exits: [ { x:0, y:100, w:8, h:56, to:"freezer", tx:526, ty:148, dir:"left" } ],
     spawns: []
   }
 };
@@ -1301,6 +1421,28 @@ function lamp(x, y){
   ctx.fillStyle = "#4a4436"; ctx.fillRect(x, y - 26, 4, 30);
   ctx.fillStyle = "#5da33c"; ctx.fillRect(x - 3, y - 34, 10, 10);
   ctx.fillStyle = "#c9f07a"; ctx.fillRect(x - 1, y - 32, 6, 6);
+}
+function jarInterior(glass){
+  // glassy back wall with shine streaks
+  ctx.fillStyle = glass; ctx.fillRect(0, 0, 220, 44);
+  ctx.fillStyle = "rgba(255,255,255,0.35)";
+  for (let x = 10; x < 220; x += 44) ctx.fillRect(x, 6, 6, 32);
+  // plank floor lines
+  ctx.fillStyle = "rgba(0,0,0,0.15)";
+  for (let y = 54; y < 160; y += 14) ctx.fillRect(10, y, 200, 2);
+  // rug
+  ctx.fillStyle = "rgba(0,0,0,0.12)"; ctx.fillRect(76, 92, 68, 42);
+  ctx.fillStyle = "rgba(255,255,255,0.08)"; ctx.fillRect(82, 98, 56, 30);
+  // welcome mat at the exit
+  ctx.fillStyle = "rgba(255,225,74,0.25)"; ctx.fillRect(94, 146, 32, 12);
+}
+function chestDlg(itemId, flag){
+  if (G.flags[flag]) return [{ t:"THE CHEST IS EMPTY NOW. IT SEEMS PROUD TO HAVE HELPED." }];
+  if (G.inv.length >= 8) return [{ t:`THERE'S A ${ITEMS[itemId].name} INSIDE, BUT YOUR POCKETS ARE COMPLETELY FULL!` }];
+  G.flags[flag] = 1;
+  G.inv.push(itemId);
+  SFX.save();
+  return [{ t:`YOU FOUND A ${ITEMS[itemId].name}! (${ITEMS[itemId].desc})` }];
 }
 function icePillar(x, y, w, h){
   ctx.fillStyle = "#4a6aa8"; ctx.fillRect(x, y, w, h);
@@ -1397,9 +1539,9 @@ function updateWorld(){
     if (player.trail.length > 80) player.trail.shift();
   }
 
-  // camera
-  G.cam.x = clamp(player.x - W / 2, 0, Math.max(0, room.w - W));
-  G.cam.y = clamp(player.y - H / 2, 0, Math.max(0, room.h - H));
+  // camera (rooms smaller than the screen render centered)
+  G.cam.x = room.w < W ? (room.w - W) / 2 : clamp(player.x - W / 2, 0, room.w - W);
+  G.cam.y = room.h < H ? (room.h - H) / 2 : clamp(player.y - H / 2, 0, room.h - H);
 
   // exits
   const fb = feetBox(player.x, player.y);
@@ -1486,7 +1628,12 @@ function drawWorld(){
   for (const n of room.npcs){
     if (n.needFlag && !G.flags[n.needFlag]) continue;
     if (n.hideFlag && G.flags[n.hideFlag]) continue;
-    if (n.sign && !n.spr){
+    if (n.chest){
+      items.push({ y: n.y, draw(){
+        drawSpr(G.flags[n.flag] ? chestOpen : chestClosed, n.x - 6, n.y - 8, {});
+        if (!G.flags[n.flag] && (G.t >> 4) % 2 === 0) drawText("*", n.x + 6, n.y - 14, "#ffe14a");
+      } });
+    } else if (n.sign && !n.spr){
       if (!n.noDraw) items.push({ y: n.y, draw(){ signPost(n.x, n.y); } });
     } else if (n.spr){
       items.push({ y: n.y, draw(){
@@ -1528,8 +1675,8 @@ function drawWorld(){
     g.globalCompositeOperation = "source-over";
     ctx.drawImage(darkOverlay, 0, 0);
   }
+  drawExitMarkers(room);
   if (G.flash){
-    ctx.fillStyle = G.flash.color.replace("A)", G.flash.a + ")");
     ctx.globalAlpha = G.flash.a; ctx.fillStyle = G.flash.color; ctx.fillRect(0, 0, W, H);
     ctx.globalAlpha = 1;
     G.flash.a -= 0.08; if (G.flash.a <= 0) G.flash = null;
@@ -1537,6 +1684,35 @@ function drawWorld(){
   drawFade();
   if (G.menu) drawWorldMenu();
   drawDialog();
+}
+// glowing markers so the player always knows where the next area is
+function drawArrow(tx, ty, dx, dy, col){
+  ctx.fillStyle = col;
+  for (let i = 0; i < 4; i++){
+    const s = i + 1;
+    if (dx !== 0) ctx.fillRect(tx - dx * (2 + i * 2) - (dx > 0 ? 0 : 2), ty - s, 2, s * 2);
+    else ctx.fillRect(tx - s, ty - dy * (2 + i * 2) - (dy > 0 ? 0 : 2), s * 2, 2);
+  }
+}
+function drawExitMarkers(room){
+  const col = "#6fe8ff";
+  for (const ex of room.exits){
+    const sx = Math.round(ex.x - G.cam.x), sy = Math.round(ex.y - G.cam.y);
+    const cx = Math.round(sx + ex.w / 2), cy = Math.round(sy + ex.h / 2);
+    if (cx < -24 || cx > W + 24 || cy < -24 || cy > H + 24) continue;
+    const pulse = 0.5 + 0.3 * Math.sin(G.t / 16);
+    const bob = Math.sin(G.t / 12) * 2;
+    ctx.fillStyle = col;
+    ctx.globalAlpha = pulse * 0.35;
+    if (ex.dir === "up") ctx.fillRect(sx - 1, sy - 30, ex.w + 2, 30 + ex.h); // glow the doorway
+    else ctx.fillRect(sx, sy, ex.w, ex.h);
+    ctx.globalAlpha = pulse;
+    if (ex.dir === "right") drawArrow(cx - 8 + bob, cy, 1, 0, col);
+    else if (ex.dir === "left") drawArrow(cx + 8 - bob, cy, -1, 0, col);
+    else if (ex.dir === "up") drawArrow(cx, sy - 34 - bob, 0, -1, col);
+    else drawArrow(cx, cy + 2 + bob, 0, 1, col);
+    ctx.globalAlpha = 1;
+  }
 }
 function signPost(x, y){
   ctx.fillStyle = "#6a5432"; ctx.fillRect(x - 2, y - 8, 4, 10);
@@ -2374,11 +2550,6 @@ function drawBattle(){
   for (let x = 0; x < W; x += 32) for (let y = 0; y < 70; y += 32)
     if ((x + y) % 64 === 0) ctx.fillRect(x + 10, y + 6, 10, 10);
 
-  // intro zoom flash
-  if (B.state === "intro" && B.stateT < 14 && B.stateT % 4 < 2){
-    ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, W, H);
-  }
-
   // enemies
   for (const e of B.enemies){
     if (!e.alive && e.dying <= 0) continue;
@@ -2514,6 +2685,11 @@ function drawBattle(){
   }
   if (B.state === "bullets"){
     drawTextC("ARROWS: MOVE   HOLD X: FOCUS", 160, 224, "#5a5f72");
+  }
+  // smooth fade-in from dark on battle start (no strobing)
+  if (B.state === "intro"){
+    const a = clamp(1 - B.stateT / 36, 0, 1);
+    if (a > 0){ ctx.fillStyle = "rgba(4,5,10," + a.toFixed(3) + ")"; ctx.fillRect(-8, -8, W + 16, H + 16); }
   }
   ctx.restore();
   if (G.flash){
