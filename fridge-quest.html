@@ -149,6 +149,7 @@ function audioBoot(){
   musicGain = AC.createGain(); musicGain.gain.value = 0.5; musicGain.connect(masterGain);
   sfxGain = AC.createGain(); sfxGain.gain.value = 0.9; sfxGain.connect(masterGain);
   makeNoiseBuf();
+  makeEcho();
   if (pendingSong) playMusic(pendingSong);
 }
 function toggleMute(){
@@ -160,6 +161,46 @@ function makeNoiseBuf(){
   noiseBuf = AC.createBuffer(1, AC.sampleRate * 0.5, AC.sampleRate);
   const d = noiseBuf.getChannelData(0);
   for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+}
+// SNES-flavored ambience: a filtered feedback delay all music runs through
+let echoDelay = null;
+function makeEcho(){
+  echoDelay = AC.createDelay(0.6); echoDelay.delayTime.value = 0.26;
+  const fb = AC.createGain(); fb.gain.value = 0.32;
+  const damp = AC.createBiquadFilter(); damp.type = "lowpass"; damp.frequency.value = 2300;
+  echoDelay.connect(damp); damp.connect(fb); fb.connect(echoDelay);
+  const wet = AC.createGain(); wet.gain.value = 0.5;
+  echoDelay.connect(wet); wet.connect(musicGain);
+}
+// one music note: dual detuned oscillators + vibrato + lowpass + echo send
+function scheduleNote(tr, midi, t0, durS){
+  const f = freqOf(midi);
+  const g = AC.createGain();
+  const lp = AC.createBiquadFilter(); lp.type = "lowpass";
+  lp.frequency.value = Math.min(9500, f * (tr.wave === "triangle" ? 6 : tr.wave === "sawtooth" ? 3 : 3.5));
+  g.connect(lp); lp.connect(musicGain);
+  if (echoDelay){
+    const send = AC.createGain();
+    send.gain.value = tr.echo !== undefined ? tr.echo : (tr.wave === "triangle" ? 0.10 : 0.30);
+    lp.connect(send); send.connect(echoDelay);
+  }
+  const atk = 0.018, rel = 0.05;
+  g.gain.setValueAtTime(0.0001, t0);
+  g.gain.linearRampToValueAtTime(tr.vol, t0 + atk);
+  g.gain.setValueAtTime(tr.vol, t0 + Math.max(atk, durS - rel));
+  g.gain.linearRampToValueAtTime(0.0001, t0 + durS + 0.02);
+  const lfo = AC.createOscillator(); lfo.frequency.value = 5.3;
+  const lfoG = AC.createGain(); lfoG.gain.value = f * 0.005;
+  lfo.connect(lfoG);
+  [-4, 4].forEach(det => {
+    const o = AC.createOscillator();
+    o.type = tr.wave; o.frequency.value = f; o.detune.value = det;
+    lfoG.connect(o.frequency);
+    const og = AC.createGain(); og.gain.value = 0.5;
+    o.connect(og); og.connect(g);
+    o.start(t0); o.stop(t0 + durS + 0.06);
+  });
+  lfo.start(t0); lfo.stop(t0 + durS + 0.06);
 }
 const NOTE_RE = /^([A-G])(#?)(\d)$/;
 function midiOf(tok){
@@ -259,6 +300,34 @@ const SONGS = {
     ],
     noise: ". . . . h . . . . . . . h . . . . . . . h . . . . . . . h . . ."
   },
+  // Shelf Pass — curious tiptoe march, G major
+  shelf: {
+    bpm: 118, tracks: [
+      { wave: "square", vol: 0.10, seq:
+        "G4 ~  B4 ~  D5 ~  B4 G4 A4 ~  C5 ~  E5 ~  C5 A4 B4 ~  D5 ~  G5 ~  F5 D5 E5 D5 B4 G4 A4 ~  B4 ~ " +
+        "G4 ~  B4 ~  D5 ~  E5 D5 C5 ~  E5 ~  G5 ~  E5 C5 D5 ~  F5 ~  A5 ~  G5 F5 G5 D5 B4 G4 G4 ~  .  ." },
+      { wave: "square", vol: 0.05, seq:
+        ".  .  G3 .  .  .  G3 .  .  .  A3 .  .  .  A3 .  .  .  B3 .  .  .  B3 .  .  .  C4 .  A3 .  D4 . " +
+        ".  .  G3 .  .  .  B3 .  .  .  C4 .  .  .  C4 .  .  .  D4 .  .  .  D4 .  .  .  B3 .  G3 .  D3 ." },
+      { wave: "triangle", vol: 0.22, seq:
+        "G2 .  D3 .  E2 .  D3 .  C2 .  G2 .  D2 .  D3 .  G2 .  D3 .  E2 .  B2 .  C3 .  D3 .  G2 .  D2 . " +
+        "G2 .  D3 .  C2 .  G2 .  A2 .  E3 .  F2 .  C3 .  G2 .  D3 .  E2 .  C3 .  G2 .  D2 .  G2 .  G2 ." },
+    ],
+    noise: "k . h . s . h . k . h . s . h h k . h . s . h . k . h . s . h . " +
+           "k . h . s . h . k . h . s . h h k . h . s . h . k . s . h . s ."
+  },
+  // Freezer Depths — heavy, slow, wrong
+  depths: {
+    bpm: 66, tracks: [
+      { wave: "triangle", vol: 0.22, seq:
+        "D3 ~  ~  ~  ~  ~  ~  ~  F3 ~  ~  ~  E3 ~  ~  ~  G3 ~  ~  ~  F3 ~  ~  ~  E3 ~  ~  ~  C#3 ~  ~  ~" },
+      { wave: "square", vol: 0.045, seq:
+        ".  .  .  .  D5 ~  .  .  .  .  .  .  A4 ~  .  .  .  .  .  .  E5 ~  .  .  .  .  G4 ~  .  C#5 ~  ." },
+      { wave: "triangle", vol: 0.24, seq:
+        "D2 ~  ~  ~  ~  ~  ~  ~  A1 ~  ~  ~  ~  ~  ~  ~  B1 ~  ~  ~  ~  ~  ~  ~  A1 ~  ~  ~  C#2 ~  ~  ~" },
+    ],
+    noise: ". . . k . . . . h . . . . . . . . . . k . . . . h . . . k . . ."
+  },
   // Battle — driving A minor
   battle: {
     bpm: 140, tracks: [
@@ -329,22 +398,14 @@ function musicTick(){
       for (const ev of tr.events){
         if (ev.step !== st) continue;
         if (muted) continue;
-        const o = AC.createOscillator(), g = AC.createGain();
-        o.type = tr.wave; o.frequency.value = freqOf(ev.midi);
-        const durS = ev.dur * stepDur;
-        g.gain.setValueAtTime(0.0001, t0);
-        g.gain.linearRampToValueAtTime(tr.vol, t0 + 0.01);
-        g.gain.setValueAtTime(tr.vol, t0 + Math.max(0.01, durS - 0.04));
-        g.gain.linearRampToValueAtTime(0.0001, t0 + durS);
-        o.connect(g); g.connect(musicGain);
-        o.start(t0); o.stop(t0 + durS + 0.03);
+        scheduleNote(tr, ev.midi, t0, ev.dur * stepDur);
       }
     }
     if (song.noise && !muted){
       const n = song.noise[songStep % song.noise.length];
-      if (n === "h") noiseAt(t0, 0.03, 0.10, 2.6);
-      else if (n === "s") noiseAt(t0, 0.09, 0.22, 1.2);
-      else if (n === "k"){ noiseAt(t0, 0.05, 0.18, 0.4);
+      if (n === "h") noiseAt(t0, 0.03, 0.10, 2.6, "hat");
+      else if (n === "s") noiseAt(t0, 0.09, 0.22, 1.2, "snare");
+      else if (n === "k"){ noiseAt(t0, 0.05, 0.16, 0.4, "kick");
         const o = AC.createOscillator(), g = AC.createGain();
         o.type = "triangle"; o.frequency.setValueAtTime(110, t0);
         o.frequency.exponentialRampToValueAtTime(45, t0 + 0.09);
@@ -356,11 +417,17 @@ function musicTick(){
     nextStepT += stepDur;
   }
 }
-function noiseAt(t0, dur, vol, rate){
+function noiseAt(t0, dur, vol, rate, kind){
   const s = AC.createBufferSource(); s.buffer = noiseBuf; s.playbackRate.value = rate;
   const g = AC.createGain();
+  const f = AC.createBiquadFilter();
+  if (kind === "hat"){ f.type = "highpass"; f.frequency.value = 6500; }
+  else if (kind === "snare"){ f.type = "bandpass"; f.frequency.value = 1900; f.Q.value = 0.7; }
+  else { f.type = "lowpass"; f.frequency.value = 2400; }
   g.gain.setValueAtTime(vol, t0); g.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
-  s.connect(g); g.connect(musicGain); s.start(t0); s.stop(t0 + dur + 0.02);
+  s.connect(f); f.connect(g); g.connect(musicGain);
+  if (kind === "snare" && echoDelay){ const sd = AC.createGain(); sd.gain.value = 0.22; g.connect(sd); sd.connect(echoDelay); }
+  s.start(t0); s.stop(t0 + dur + 0.02);
 }
 function playJingle(kind){
   stopMusic();
@@ -763,6 +830,25 @@ const shrineSpr = S([
 "..mmmmmmmmmmmm..",
 ], { m:"#8ca8c0", I:"#c8e8f8" });
 
+// secret boss: a very lost bag of chips
+const chipsSpr = S([
+"rRrRrRrRrRrRrR",
+"rrrrrrrrrrrrrr",
+"ryyyyyyyyyyyyr",
+"ryyyooooooyyyr",
+"ryyooooooooyyr",
+"ryyyooooooyyyr",
+"rrrrrrrrrrrrrr",
+"rrwkrrrrrwkrrr",
+"rrrrrrrrrrrrrr",
+"rrrkrrkkrrkrrr",
+"rrrrrrrrrrrrrr",
+"rRrrrrrrrrrrRr",
+"rRrrrrrrrrrrRr",
+"rrrrrrrrrrrrrr",
+"rRrRrRrRrRrRrR",
+], { r:"#e04848", R:"#a83038", y:"#ffd84a", o:"#e8a030", k:"#14141c", w:"#ffffff" });
+
 // item chests (closed / opened)
 const chestPal = { b:"#8a6a3c", d:"#b08a4c", y:"#ffe14a", k:"#241c10" };
 const chestClosed = S([
@@ -944,7 +1030,26 @@ const ITEMS = {
   juice:    { name:"JUICE BOX",     heal:30, tp:20, desc:"30 HP AND 20% TP." },
   bread:    { name:"WARM BREAD",    healAll:35, desc:"WHOLE PARTY +35 HP." },
   cheese:   { name:"CHEESE WHEEL",  heal:60, desc:"SMELLS LIKE VICTORY. 60 HP." },
-  marinara: { name:"TINY MARINARA", heal:80, desc:"RICH. RED. RESTORES 80 HP." }
+  marinara: { name:"TINY MARINARA", heal:80, desc:"RICH. RED. RESTORES 80 HP." },
+  chip:     { name:"ONE PERFECT CHIP", heal:99, desc:"COOL. DRY. TRANSCENDENT. 99 HP." }
+};
+// how each hero reacts to snacking from the menu
+const ITEM_REACTIONS = {
+  dorko: [
+    "CRUNCHY. FINE. BACK TO THE ROLLS.",
+    "MM. THAT HAPPENED. EAST, EVERYONE.",
+    "THE {ITEM} WAS ACCEPTABLE. THE ROLLS REMAIN THE MISSION."
+  ],
+  mega: [
+    "THE {ITEM}... IT TASTES LIKE HOPE. I'D FORGOTTEN HOPE.",
+    "I FELT WARMTH FOR A SECOND. PLEASE DON'T TAKE THIS MOMENT FROM ME.",
+    "EVERY BITE IS A TINY VICTORY AGAINST THE COLD. AND STILL I SHIVER."
+  ],
+  bmo: [
+    "HP RESTORED. CLUTCH HEAL.",
+    "SNACK CONSUMED. INVENTORY OPTIMIZED. NICE.",
+    "THE {ITEM} GOES STRAIGHT INTO THE BUILD. FEELING TANKY."
+  ]
 };
 
 // ---------------- save / load ----------------
@@ -1131,7 +1236,7 @@ const ROOMS = {
             return [
               { t:"MAYOR CABBAGIO: WELCOME TO CRISPER VILLAGE! CRUNCHIEST CORNER OF THE COLD WORLD." },
               { t:"MAYOR CABBAGIO: TRAVELERS, EH? SEEKING THE MYTHICAL PIZZA ROLLS, NO DOUBT." },
-              { p:"dorko", name:"DORKO", t:"HOW'D YOU KNOW?" },
+              { p:"dorko", name:"DORKO", t:"SKIP TO THE PART WHERE THE ROLLS ARE." },
               { t:"MAYOR CABBAGIO: EVERYONE WHO FALLS IN HERE IS. THE ROLLS LIE PAST SHELF PASS, DEEP IN THE FREEZER... GUARDED BY KING GLACION." },
               { t:"MAYOR CABBAGIO: HE HOARDS EVERYTHING WARM. IT'S A WHOLE THING. GOOD LUCK!" }
             ];
@@ -1145,17 +1250,17 @@ const ROOMS = {
                : n % 3 === 1 ? [{ t:"2%: MY EXPIRY DATE? WE... WE DON'T TALK ABOUT THAT." }]
                : [{ t:"2%: STAY COOL. LITERALLY. IT'S HOW WE ALL SURVIVE." }];
         } },
-      { id:"baker", x:430, y:130, spr:baguetteSpr, w:12, h:12, solid:true, name:"BAGUETTE BANDIT",
+      { id:"baker", x:474, y:148, spr:baguetteSpr, w:12, h:12, solid:true, name:"BAGUETTE BANDIT",
         dlg(){ return shopScript(); } },
       { id:"yogurt", x:300, y:220, spr:yogurtSpr, w:10, h:10, solid:true, name:"LIL YOGURT",
         dlg(n){
           return n % 2 ? [{ t:"LIL YOGURT: MOM SAYS I'M FULL OF ACTIVE CULTURES. I JUST WANNA BE ACTIVE." }]
                        : [{ t:"LIL YOGURT: ONE DAY I'LL BE A PARFAIT. DREAM BIG, THAT'S WHAT I ALWAYS SAY." }];
         } },
-      { id:"tom1", x:480, y:160, spr:tomatoSpr, w:10, h:10, solid:true, name:"TERRY",
+      { id:"tom1", x:452, y:196, spr:tomatoSpr, w:10, h:10, solid:true, name:"TERRY",
         dlg(){ return [{ t:"TERRY: I'M A VEGETABLE. IT'S MY WHOLE IDENTITY." }]; } },
-      { id:"tom2", x:498, y:168, spr:tomatoSpr, w:10, h:10, solid:true, name:"JERRY",
-        dlg(){ return [{ t:"JERRY: WE'RE FRUIT, TERRY. BOTANICALLY WE ARE FRUIT." }, { t:"TERRY: NOT IN MY HEART, JERRY." }]; } },
+      { id:"tom2", x:512, y:230, spr:tomatoSpr, w:10, h:10, solid:true, name:"JERRY",
+        dlg(){ return [{ t:"JERRY: WE'RE FRUIT, TERRY. BOTANICALLY WE ARE FRUIT." }, { t:"TERRY: (FROM ACROSS THE YARD) NOT IN MY HEART, JERRY!" }]; } },
       { id:"butter", x:70, y:250, spr:butterSpr, w:14, h:10, solid:true, name:"BUTTER GOLEM",
         dlg(n){
           return n % 2 ? [{ t:"BUTTER GOLEM: SOFT......... SPREADABLE........." }]
@@ -1269,7 +1374,7 @@ const ROOMS = {
     spawns: []
   },
   shelf: {
-    w: 640, h: 200, music: "town", dark: false,
+    w: 640, h: 200, music: "shelf", dark: false,
     floor: "#4a4436",
     walls: [
       { x:0, y:0, w:640, h:52 }, { x:0, y:186, w:640, h:14 },
@@ -1294,7 +1399,15 @@ const ROOMS = {
     },
     npcs: [
       { id:"sign2", x:80, y:100, spr:null, w:16, h:12, sign:true,
-        dlg(){ return [{ t:"SHELF PASS. BEWARE OF SENTIENT SNACKS. NO REFUNDS." }]; } }
+        dlg(){
+          if (G.flags.bossDone && !G.flags.secretDone)
+            return [{ t:"SHELF PASS. BEWARE OF SENTIENT SNACKS. NO REFUNDS." },
+                    { t:"PS: SOMETHING KEEPS CRINKLING UP ON THE TOP SHELF. IT SOUNDS... LOST." }];
+          return [{ t:"SHELF PASS. BEWARE OF SENTIENT SNACKS. NO REFUNDS." }];
+        } },
+      { id:"crispus", x:600, y:70, spr:chipsSpr, w:14, h:12, solid:true, name:"???",
+        needFlag:"bossDone", hideFlag:"secretDone",
+        dlg(){ return crispusScript(); } }
     ],
     saves: [],
     exits: [
@@ -1309,7 +1422,7 @@ const ROOMS = {
     ]
   },
   freezer: {
-    w: 560, h: 300, music: "freezer", dark: true,
+    w: 560, h: 300, music: "depths", dark: true,
     floor: "#1e2745",
     walls: [
       { x:0, y:0, w:560, h:64 }, { x:0, y:286, w:560, h:14 },
@@ -1579,16 +1692,22 @@ function updateWorld(){
         return;
       }
     }
+    let best = null, bestD = 1e9;
     for (const n of room.npcs){
       if (n.needFlag && !G.flags[n.needFlag]) continue;
       if (n.hideFlag && G.flags[n.hideFlag]) continue;
-      if (dist(px, py, n.x, n.y) < 24 || dist(player.x, player.y, n.x, n.y) < 28){
-        SFX.interact();
-        talkCounts[n.id] = (talkCounts[n.id] || 0) + 1;
-        const script = n.dlg(talkCounts[n.id] - 1);
-        if (script) say(script);
-        return;
+      const dProbe = dist(px, py, n.x, n.y), dBody = dist(player.x, player.y, n.x, n.y);
+      if (dProbe < 24 || dBody < 28){
+        const d = Math.min(dProbe, dBody);
+        if (d < bestD){ bestD = d; best = n; }
       }
+    }
+    if (best){
+      SFX.interact();
+      talkCounts[best.id] = (talkCounts[best.id] || 0) + 1;
+      const script = best.dlg(talkCounts[best.id] - 1);
+      if (script) say(script);
+      return;
     }
   }
 }
@@ -1745,9 +1864,12 @@ function updateWorldMenu(){
     if (pressed.down){ eat("down"); m.target = (m.target + 1) % 3; SFX.move(); }
     if (pressed.z){
       eat("z");
-      useItem(G.inv[m.itemSel], m.target);
-      m.view = G.inv.length ? "items" : "main";
-      m.itemSel = 0;
+      const id = G.inv[m.itemSel];
+      const t = G.party[m.target];
+      useItem(id, m.target);
+      G.menu = null;
+      const line = pick(ITEM_REACTIONS[t.id]).replace("{ITEM}", ITEMS[id].name);
+      say([{ p: t.id, name: t.name, t: line }]);
     }
   }
 }
@@ -1891,6 +2013,19 @@ const ENEMY_DEFS = {
     killText:"KONGY CRUMBLES LIKE FINE CHEESE. THE SMELL LINGERS. IT ALWAYS WILL.",
     spareText:"KONGY STEPS ASIDE AND GIVES YOU A CHEESE WHEEL. A TRUE BRO."
   },
+  chips: {
+    name:"CRISPUS", spr:chipsSpr, hp:520, atk:10, def:3, exp:200, crumbs:150, pattern:"chips",
+    check:"CRISPUS - ATK 10 DEF 3. A BAG OF CHIPS IN A FRIDGE. NEITHER OF THEM KNOWS WHY.",
+    quotes:["WHY AM I IN A FRIDGE?! CHIPS ARE SHELF-STABLE!!","WAS I BOUGHT BY MISTAKE? AM I A MISTAKE?!","IT'S SO COLD AND I HAVE SO MANY QUESTIONS.","MY BEST-BY DATE IS A LIE AND SO IS MY LIFE."],
+    acts:[
+      { t:"REASSURE", fn(e){ e.reassured = true; return "YOU TELL CRISPUS THAT PLENTY OF PERFECTLY GOOD SNACKS END UP IN WEIRD PLACES. HE SNIFFLES INTO HIS OWN FOIL."; } },
+      { t:"READ LABEL", fn(e){
+          if (e.reassured){ e.spareable = true; return "YOU READ THE BACK OF THE BAG: 'STORE IN A COOL, DRY PLACE.' CRISPUS GASPS. HE'S BEEN HOME ALL ALONG."; }
+          return "CRISPUS IS TOO WORKED UP TO LISTEN TO PACKAGING. REASSURE HIM FIRST."; } }
+    ],
+    killText:"CRISPUS CRUMBLES. THE CRUMBS AT THE BOTTOM WERE THE FRIENDS HE MADE ALONG THE WAY.",
+    spareText:"CRISPUS SETTLES ONTO THE SHELF, AT PEACE. COOL. DRY. HOME."
+  },
   glacion: {
     name:"KING GLACION", spr:glacionSpr, hp:480, atk:9, def:3, exp:150, crumbs:120, pattern:"boss",
     check:"KING GLACION - ATK 9 DEF 3. AN ANCIENT TV DINNER, FREEZER-BURNED INTO ROYALTY. HOARDS EVERYTHING WARM.",
@@ -1914,8 +2049,13 @@ const ENEMY_DEFS = {
 const GROUPS = {
   tut: ["gherkin"], shelf1: ["eggbert"], shelf2: ["gherkin", "eggbert"],
   freezer1: ["onion"], freezer2: ["onion", "onion"],
-  kongyFight: ["kongy"], boss: ["glacion"]
+  kongyFight: ["kongy"], boss: ["glacion"], secret: ["chips"]
 };
+const CHIPS_PANIC_QUOTES = [
+  "THE HAND COMES FOR US ALL!!",
+  "I REFUSE TO BE A SNACK! I AM A JOURNEY!!",
+  "CRINKLE LOUDER!! MAYBE IT FEARS SOUND!!"
+];
 const SPELLS = {
   dorko: [ { name:"SHELL CYCLONE", cost:30, kind:"allatk", pow:1.4, desc:"SPIN INTO EVERYONE. HITS ALL." } ],
   mega:  [ { name:"BLUE BURN", cost:25, kind:"atk", pow:2.2, desc:"COLD FIRE. BIG DAMAGE, SAPS ATTACK." } ],
@@ -1943,24 +2083,25 @@ function startBattle(groupId, flag){
     bullets:[], fx:[], dmgNums:[],
     fightX:0, fightDone:false, fightTargets:[],
     phaseT:0, phaseLen:400, slowNext:1, curSlow:1,
-    bossPhase:1, bossDlgQueue:[], canFlee: !(groupId === "tut" || groupId === "boss" || groupId === "kongyFight"),
+    bossPhase:1, bossDlgQueue:[], canFlee: !(groupId === "tut" || groupId === "boss" || groupId === "kongyFight" || groupId === "secret"),
     tutorial: groupId === "tut", tutHintT:0,
     rewardExp:0, rewardCrumbs:0, endFlavor:""
   };
   G.mode = "battle";
   SFX.encounter();
-  playMusic(groupId === "boss" ? "boss" : "battle");
+  playMusic(groupId === "boss" || groupId === "secret" ? "boss" : "battle");
   B.msg = B.tutorial ? "A WILD GHERKIN JIGGLES INTO YOUR PATH!"
         : groupId === "boss" ? "KING GLACION DESCENDS FROM HIS FROSTBITTEN THRONE!"
         : groupId === "kongyFight" ? "KONGY GORGONZOLA BEATS HIS MAGNIFICENT CHEST!"
+        : groupId === "secret" ? "CRISPUS PUFFS UP WITH NITROGEN AND EXISTENTIAL FURY!"
         : pick(["THE COLD AIR CRACKLES!", "SNACKS APPROACH WITH INTENT!", "IT SMELLS LIKE TROUBLE. AND FOOD."]);
   if (B.tutorial && !G.flags.tutSeen){
     G.flags.tutSeen = 1;
     say([
-      { p:"bmo", name:"BMO", t:"BATTLE TUTORIAL DOWNLOADED! PICK FIGHT, THEN PRESS Z WHEN THE CURSOR HITS THE GREEN CENTER!" },
-      { p:"bmo", name:"BMO", t:"OR BE NICE! ACT LETS YOU TALK IT OUT. WHEN A NAME GLOWS YELLOW, SPARE THEM!" },
-      { p:"bmo", name:"BMO", t:"ON THEIR TURN, MOVE THE HEART TO DODGE! GRAZE CLOSE TO BULLETS TO CHARGE TP FOR MAGIC!" },
-      { p:"bmo", name:"BMO", t:"DEFEND MEANS YOU TAKE THE HITS FOR THE TEAM, BUT HALVED! TEAMWORK!" }
+      { p:"bmo", name:"BMO", t:"OKAY, TUTORIAL TIME! FIGHT IS A TIMING MINIGAME - PRESS Z DEAD CENTER FOR A CRIT!" },
+      { p:"bmo", name:"BMO", t:"OR GO PACIFIST ROUTE: USE ACT TO TALK IT OUT, THEN SPARE WHEN THE NAME GLOWS YELLOW." },
+      { p:"bmo", name:"BMO", t:"THEIR TURN IS A BULLET HELL. MOVE THE HEART! GRAZE CLOSE TO BULLETS FOR TP - RISKY PLAYS FILL THE METER." },
+      { p:"bmo", name:"BMO", t:"DEFEND TANKS FOR THE WHOLE TEAM AT HALF DAMAGE. SOMEBODY HAS TO MAIN SUPPORT. TEAMWORK!" }
     ]);
   }
 }
@@ -1995,6 +2136,18 @@ function hurtEnemy(e, dmg){
     SFX.boom();
   }
   if (e.defId === "glacion") checkBossPhase(e);
+  if (e.defId === "chips") checkChipsPhase(e);
+}
+function checkChipsPhase(e){
+  if (!e.phase2 && e.alive && e.hp <= e.maxhp / 2){
+    e.phase2 = true;
+    B.bossDlgQueue.push([
+      { t:'A DISTANT, MUFFLED VOICE FROM SOMEWHERE FAR ABOVE: "HAND ME A BAG OF THEM POTATO CHIPS."' },
+      { t:"THE WHOLE FRIDGE TREMBLES. CRISPUS FREEZES MID-CRINKLE." },
+      { p:"bmo", name:"BMO", t:"UH OH. SOMEONE UPSTAIRS JUST ROLLED FOR LOOT. AND CRISPUS IS THE DROP." },
+      { t:"CRISPUS: NO!! NOT LIKE THIS!! I ONLY JUST FIGURED OUT WHERE I LIVE!!" }
+    ]);
+  }
 }
 function checkBossPhase(e){
   const frac = e.hp / e.maxhp;
@@ -2229,6 +2382,10 @@ function doSpare(e){
       if (G.inv.length < 8) G.inv.push("cheese");
       else B.msg = "KONGY OFFERS A CHEESE WHEEL, BUT YOUR POCKETS ARE FULL. HE NODS. THE RESPECT REMAINS.";
     }
+    if (e.defId === "chips"){
+      if (G.inv.length < 8) G.inv.push("chip");
+      else B.msg = "CRISPUS OFFERS ONE PERFECT CHIP, BUT YOUR POCKETS ARE FULL. HE UNDERSTANDS. STORAGE IS COMPLICATED.";
+    }
   } else {
     B.msg = e.mercy > 0 || e.soft || e.sniffed
       ? `${e.name} IS ALMOST THERE. KEEP AT IT!`
@@ -2297,7 +2454,7 @@ function defaultMsg(){
   if (B.groupId === "boss") return "GLACION'S COLD GAZE SETTLES ON YOU.";
   return pick([
     `${e.name} ${e.defId === "kongy" ? "FLEXES MAGNIFICENTLY." : "SHUFFLES MENACINGLY."}`,
-    `THE AIR SMELLS LIKE ${e.defId === "gherkin" ? "VINEGAR" : e.defId === "eggbert" ? "BREAKFAST" : e.defId === "onion" ? "TEARS" : "CHEESE"}.`,
+    `THE AIR SMELLS LIKE ${e.defId === "gherkin" ? "VINEGAR" : e.defId === "eggbert" ? "BREAKFAST" : e.defId === "onion" ? "TEARS" : e.defId === "chips" ? "NACHO-SCENTED DESPAIR" : "CHEESE"}.`,
     `${e.name} EYES THE PARTY.`,
     e.spareable ? `${e.name} IS READY TO BE SPARED!` : `${e.name} HOLDS ITS GROUND.`
   ]);
@@ -2341,6 +2498,8 @@ function enemyBubble(){
       3: ["I DON'T WANT TO BE LEFTOVER AGAIN!!", "COLD KEEPS! COLD KEEPS!! COLD KEEPS!!!", "PLEASE... JUST... STAY..."]
     }[B.bossPhase];
     B.bubble = { text: lines[B.turn % lines.length], e };
+  } else if (e.defId === "chips"){
+    B.bubble = { text: pick(e.phase2 ? CHIPS_PANIC_QUOTES : e.quotes), e };
   } else {
     B.bubble = { text: pick(e.quotes), e };
   }
@@ -2352,7 +2511,7 @@ function startBullets(){
   B.bullets = [];
   B.soul.x = B.box.x + B.box.w / 2; B.soul.y = B.box.y + B.box.h / 2; B.soul.inv = 0;
   B.phaseT = 0;
-  B.phaseLen = B.groupId === "boss" ? 430 + B.bossPhase * 30 : 380;
+  B.phaseLen = B.groupId === "boss" ? 430 + B.bossPhase * 30 : B.groupId === "secret" ? 430 : 380;
   B.curSlow = B.slowNext; B.slowNext = 1;
   B.tutHintT = B.tutorial ? 240 : 0;
   setState("bullets");
@@ -2463,6 +2622,24 @@ function runPattern(e){
           r: 4, dmg: e.atk, col:"#e8c99a", kind:"ring" });
       }
     }
+  } else if (pat === "chips"){
+    const m = (e.phase2 ? 1.3 : 1) * spdMul;
+    if (t % 42 === 8){
+      aimShot(e, box, 2.2 * m, "#e8a030", "chip", 4);
+      aimShot(e, box, 2.2 * m, "#e8a030", "chip", 4, 0.4);
+      aimShot(e, box, 2.2 * m, "#e8a030", "chip", 4, -0.4);
+    }
+    if (t % 36 === 20){
+      const gap = (Math.sin(t * 0.023 + e.seed) * 0.5 + 0.5) * (box.w - 44) + box.x + 22;
+      for (let x = box.x + 8; x < box.x + box.w - 4; x += 20)
+        if (Math.abs(x - gap) >= 18)
+          spawnBullet({ x, y: box.y + 4, vx: 0, vy: 1.35 * m, r: 3, dmg: e.atk, col:"#f8e8c8", kind:"shard" });
+    }
+    if (e.phase2 && t % 14 === 0){
+      const a = t * 0.17;
+      spawnBullet({ x: box.x + box.w / 2, y: box.y + box.h / 2 - 12,
+        vx: Math.cos(a) * 1.4 * spdMul, vy: Math.sin(a) * 1.4 * spdMul, r: 4, dmg: e.atk, col:"#e8a030", kind:"chip" });
+    }
   } else if (pat === "bounce"){
     const count = B.bullets.filter(b => b.kind === "bounce").length;
     if (t % 70 === 20 && count < 4){
@@ -2521,6 +2698,7 @@ function finishBattle(won){
     G.flags.bossSpared = allSpared;
   }
   if (won && B.groupId === "kongyFight") G.flags.kongySpared = allSpared;
+  if (won && B.groupId === "secret") G.flags.secretSpared = allSpared;
   B = null;
   G.mode = "world";
   G.invuln = 100;
@@ -2713,6 +2891,11 @@ function drawBullet(b){
     ctx.fillRect(b.x - 1, b.y - b.r + 1, 2, b.r * 2 - 2);
   } else if (b.kind === "egg"){
     ctx.beginPath(); ctx.ellipse(b.x, b.y, b.r - 1, b.r + 1, 0, 0, 7); ctx.fill();
+  } else if (b.kind === "chip"){
+    ctx.fillRect(b.x - 4, b.y - 3, 8, 2);
+    ctx.fillRect(b.x - 3, b.y - 1, 6, 2);
+    ctx.fillRect(b.x - 2, b.y + 1, 4, 2);
+    ctx.fillRect(b.x - 1, b.y + 3, 2, 1);
   } else if (b.kind === "homing"){
     const pulse = 1 + Math.sin(G.t / 4) * 0.3;
     ctx.beginPath(); ctx.arc(b.x, b.y, b.r * pulse, 0, 7); ctx.fill();
@@ -2732,22 +2915,22 @@ function newGame(){
   G.fade.a = 1; G.fade.dir = 0; G.fade.cb = null; // hold black for narration
   say([
     { t:"SOMEWHERE IN A KITCHEN, AT PRECISELY SNACK O'CLOCK..." },
-    { p:"dorko", name:"DORKO", t:"THE FREEZER! MY TRIANGLE SENSES ARE TINGLING. PIZZA ROLLS ARE NEAR." },
-    { p:"mega", name:"MEGAFIRE", t:"DORKO, WE'VE SEARCHED FOR HOURS. THE FREEZER IS EMPTY. LIKE MY STOMACH. AND, INCREASINGLY, MY HEART." },
-    { p:"bmo", name:"BMO", t:"GUYS. THE SHELF UNDER ME FEELS WEIRDLY LIKE A TRAPDOO-" },
+    { p:"dorko", name:"DORKO", t:"PIZZA ROLLS. I CAN FEEL THEM. NOTHING ELSE CURRENTLY MATTERS." },
+    { p:"mega", name:"MEGAFIRE", t:"WE'VE SEARCHED FOR HOURS, DORKO. MY HANDS ARE COLD. MY HEART IS COLDER. THIS QUEST IS EATING ME ALIVE." },
+    { p:"bmo", name:"BMO", t:"GUYS. THIS SHELF HAS 'TRAP FLOOR' WRITTEN ALL OVER IT. I'VE CLEARED ENOUGH DUNGEONS TO KNOW A-" },
     { t:"THE SHELF GIVES WAY." }
   ], () => {
     SFX.fall();
     G.fade.dir = -1;
     setTimeout(() => { SFX.boom(); shake(6, 20); }, 500);
     say([
-      { p:"dorko", name:"DORKO", t:"EVERYONE ALIVE? SOUND OFF." },
-      { p:"mega", name:"MEGAFIRE", t:"COLD. BUT ALIVE." },
-      { p:"bmo", name:"BMO", t:"I LANDED ON MY HAT. MY HAT IS FINE. I AM ALSO FINE, THANKS FOR ASKING." },
+      { p:"dorko", name:"DORKO", t:"HEADCOUNT. THREE. GOOD. THE ROLLS ARE CLOSE, I CAN TELL." },
+      { p:"mega", name:"MEGAFIRE", t:"ALIVE. TRAGICALLY, STILL COLD. WHY DO WE SUFFER LIKE THIS." },
+      { p:"bmo", name:"BMO", t:"SOFT LANDING. ZERO FALL DAMAGE. MY HAT TANKED IT LIKE A CHAMP." },
       { t:"YOU HAVE FALLEN INTO THE COLD WORLD... THE SECRET KINGDOM INSIDE THE FRIDGE." },
-      { p:"mega", name:"MEGAFIRE", t:"...THE FRIDGE HAS A KINGDOM? WE PUT LEFTOVERS IN A KINGDOM?" },
-      { p:"bmo", name:"BMO", t:"NEW QUEST ACQUIRED: FIND THE MYTHICAL PIZZA ROLLS. LET'S ROLL." },
-      { p:"dorko", name:"DORKO", t:"...NICE. OKAY. EAST LOOKS PROMISING. WATCH OUT FOR ANGRY SNACKS." }
+      { p:"mega", name:"MEGAFIRE", t:"...THE FRIDGE HAS A KINGDOM? HOW LONG HAS IT BEEN DOWN HERE? HOW LONG HAVE WE BEEN UP THERE... EATING ITS PEOPLE?" },
+      { p:"bmo", name:"BMO", t:"QUEST UPDATED: FIND THE MYTHICAL PIZZA ROLLS. MAIN STORY. NO SKIPPING CUTSCENES." },
+      { p:"dorko", name:"DORKO", t:"ROLLS FIRST. QUESTIONS NEVER. EAST." }
     ], () => { G.flags.introDone = 1; saveGame(); });
   });
 }
@@ -2768,10 +2951,10 @@ function bossIntroScript(){
   return [
     { p:"glacion", name:"KING GLACION", t:"SO. THE WARM ONES COME CRAWLING FOR MY TREASURE." },
     { p:"glacion", name:"KING GLACION", t:"I AM GLACION. FIRST OF THE FROST. KING OF LEFTOVERS. DUKE OF THE DEEP CHILL." },
-    { p:"dorko", name:"DORKO", t:"COOL CROWN. LOVE THE ICICLES. WE'RE HERE FOR THE PIZZA ROLLS." },
+    { p:"dorko", name:"DORKO", t:"UH HUH. GREAT SPEECH. WHERE ARE THE ROLLS." },
     { p:"glacion", name:"KING GLACION", t:"THE ROLLS STAY. WARM THINGS ALWAYS LEAVE... SO NOTHING HERE IS ALLOWED TO BE WARM." },
-    { p:"mega", name:"MEGAFIRE", t:"(PSST. THIS GUY IS NOT OKAY.)" },
-    { p:"bmo", name:"BMO", t:"(SHH. WE'LL UNPACK IT IN BATTLE.)" },
+    { p:"mega", name:"MEGAFIRE", t:"(HE'S HURTING, DORKO. CAN'T YOU HEAR IT? THE FROST IS JUST GRIEF WITH BETTER PR.)" },
+    { p:"bmo", name:"BMO", t:"(BOSS FIGHT INCOMING. STOCK UP ON TP. WE TALK HIM DOWN MID-FIGHT - CLASSIC STRAT.)" },
     { p:"glacion", name:"KING GLACION", t:"FACE THE COLD!!" },
     { fn(){ startBattle("boss", null); }, t:"THE AIR ITSELF FREEZES OVER!!" }
   ];
@@ -2780,33 +2963,64 @@ function postBossScript(){
   if (G.flags.bossSpared){
     return [
       { p:"glacion", name:"KING GLACION", t:"...WARM. I HAD FORGOTTEN WARM. TAKE THE ROLLS, LITTLE ONES. THEY WERE NEVER MINE TO KEEP." },
-      { p:"dorko", name:"DORKO", t:"YOU COULD COME UP TO THE CRISPER SOMETIME, YOUR FROSTINESS. THEY HAVE A BAKERY." },
+      { p:"dorko", name:"DORKO", t:"GOOD TALK. ROLLS NOW." },
+      { p:"mega", name:"MEGAFIRE", t:"(HE MEANS THANK YOU. COME VISIT THE CRISPER, YOUR MAJESTY. THERE'S A BAKERY. PLEASE, PLEASE HEAL.)" },
       { p:"glacion", name:"KING GLACION", t:"A... BAKERY. YES. I WOULD LIKE THAT VERY MUCH." },
       { t:"THE SHRINE ON THE DAIS BEGINS TO GLOW." }
     ];
   }
   return [
     { t:"THE THRONE SITS EMPTY. THE FREEZER FEELS LESS LIKE A KINGDOM NOW, AND MORE LIKE A BOX." },
-    { p:"mega", name:"MEGAFIRE", t:"...WE DID WHAT WE HAD TO. FOR THE ROLLS." },
+    { p:"mega", name:"MEGAFIRE", t:"...WE DID WHAT WE HAD TO. FOR THE ROLLS. I'LL BE HEARING THAT SHATTER IN MY SLEEP." },
     { p:"bmo", name:"BMO", t:"POUR ONE OUT FOR THE COLD KING. RESPECTFULLY. ...OKAY. SHRINE TIME." },
     { t:"THE SHRINE ON THE DAIS BEGINS TO GLOW." }
   ];
 }
+function endRoute(){
+  return G.kills === 0 ? "pacifist" : G.spares === 0 ? "violent" : "neutral";
+}
 function endingScript(){
   if (G.flags.gotRolls) return [{ t:"THE SHRINE IS EMPTY NOW. YOUR HEARTS (AND STOMACHS) ARE NOT." }];
-  return [
+  const route = endRoute();
+  const script = [
     { t:"THE MYTHICAL PIZZA ROLLS. THEY GLOW WITH ANCIENT MICROWAVE ENERGY." },
-    { p:"dorko", name:"DORKO", t:"WE FOUND THEM. WE ACTUALLY FOUND THEM." },
-    { p:"mega", name:"MEGAFIRE", t:"THEY'RE FREEZER-BURNED... THEY'RE BEAUTIFUL... THEY'RE PERFECT." },
-    { p:"bmo", name:"BMO", t:"GROUP HUG. THAT'S A SPELL NOW. ZERO TP COST. UNLIMITED USES." },
+    { p:"dorko", name:"DORKO", t:"...THERE THEY ARE. EVERYTHING ELSE WAS BACKGROUND NOISE." },
+    { p:"mega", name:"MEGAFIRE", t:"THEY'RE FREEZER-BURNED... THEY'RE BEAUTIFUL... I'M CRYING AND THE TEARS ARE FREEZING. IT'S ALL HAPPENING." },
+    { p:"bmo", name:"BMO", t:"ACHIEVEMENT UNLOCKED: PIZZA ROLLS. NEW GAME PLUS? ...NAH. GROUP HUG." }
+  ];
+  if (route === "pacifist"){
+    script.push(
+      { t:"NOBODY GOT HURT DOWN HERE. SOMEHOW, THE ROLLS TASTE WARMER FOR IT." },
+      { p:"bmo", name:"BMO", t:"TRUE PACIFIST CLEAR. HUNDRED PERCENT FRIENDSHIP. LEGENDARY RUN, TEAM." }
+    );
+  } else if (route === "violent"){
+    script.push(
+      { t:"THE FRIDGE IS QUIET NOW. VERY QUIET. THE ROLLS TASTE LIKE VICTORY. MOSTLY." },
+      { p:"mega", name:"MEGAFIRE", t:"...I KEEP THINKING ABOUT THE EGG KNIGHT. HE JUST WANTED TO GUARD SOMETHING." }
+    );
+  }
+  script.push(
     { t:"YOU EAT THE MYTHICAL PIZZA ROLLS TOGETHER. THE INSIDES ARE TOO HOT. THE INSIDES ARE ALWAYS TOO HOT." },
     { t:"AND FOR ONE PERFECT SNACK O'CLOCK, THE COLD WORLD FEELS WARM.",
       fn(){
-        G.flags.gotRolls = 1; saveGame();
+        G.flags.gotRolls = 1; G.flags.endRoute = endRoute(); saveGame();
         SFX.eat();
         G.mode = "end"; G.endTimer = 0;
         playJingle("victory");
       } }
+  );
+  return script;
+}
+function crispusScript(){
+  return [
+    { t:"SOMETHING CRINKLES IN THE SHADOWS OF THE TOP SHELF..." },
+    { t:"???: YOU. SMALL WARM ONES. ANSWER ME HONESTLY." },
+    { t:"???: WHY. AM I. IN A FRIDGE." },
+    { p:"dorko", name:"DORKO", t:"ARE YOU A PIZZA ROLL? NO? THEN THIS ISN'T REALLY MY DEPARTMENT." },
+    { p:"mega", name:"MEGAFIRE", t:"OH NO. HE DOESN'T KNOW WHERE HE IS. HE DOESN'T KNOW. THAT'S THE SADDEST THING I'VE EVER-" },
+    { p:"bmo", name:"BMO", t:"HIDDEN BOSS. CALLED IT. NOBODY TOUCH ANYTHING SHINY." },
+    { t:"CRISPUS: I HAVE BEEN COLD AND CONFUSED FOR A VERY LONG TIME. AND NOW YOU WILL FEEL WHAT I FEEL!!" },
+    { fn(){ startBattle("secret", "secretDone"); }, t:"THE BAG RISES, CRACKLING WITH STATIC AND DOUBT!" }
   ];
 }
 
@@ -2910,22 +3124,48 @@ function drawEnd(){
   for (let i = 0; i < 12; i++){
     const sx = (i * 97) % W;
     const sy = (i * 61 + G.endTimer * (0.4 + (i % 4) * 0.2)) % (H + 20) - 10;
-    drawSpr(rollSpr, sx, sy, { scale: 1, alpha: 0.5 });
+    drawSpr(rollSpr, sx, sy, { scale: 1, alpha: 0.4 });
   }
+  const route = G.flags.endRoute || endRoute();
   ctx.save(); ctx.scale(2, 2);
-  drawTextC("THE END", 80, 22, "#ffe14a");
+  drawTextC("THE END", 80, 8, "#ffe14a");
   ctx.restore();
-  drawTextC("THE MYTHICAL PIZZA ROLLS WERE REAL.", 160, 70, "#c9c9d8");
-  drawTextC("THE REAL TREASURE WAS ALSO THE PIZZA ROLLS.", 160, 82, "#c9c9d8");
-  drawTextC(`SNACKS BEFRIENDED: ${G.spares}`, 160, 110, "#58c858");
-  drawTextC(`SNACKS DEFEATED: ${G.kills}`, 160, 122, "#e05858");
-  if (G.kills === 0) drawTextC("CLEANEST HANDS IN THE CRISPER!", 160, 134, "#ffe14a");
-  else if (G.spares === 0) drawTextC("THE FRIDGE REMEMBERS.", 160, 134, "#8a93a8");
-  drawTextC(`FINAL LV ${G.lv} - CRUMBS ${G.crumbs}`, 160, 150, "#8a93a8");
-  drawTextC("STARRING: DORKO, MEGAFIRE, BMO,", 160, 172, "#5a6078");
-  drawTextC("KONGY GORGONZOLA, AND A VERY OLD DINNER", 160, 182, "#5a6078");
+  const sub = route === "pacifist" ? ["THE WARM ENDING", "#58c858"]
+            : route === "violent" ? ["THE COLD ENDING", "#9fd8f0"]
+            : ["THE SNACK ENDING", "#ffe14a"];
+  drawTextC(sub[0], 160, 36, sub[1]);
+  // everyone you kept takes a bow
+  const lineup = [dorkoFront, megaFront, bmoFront];
+  if (route === "pacifist"){
+    lineup.push(gherkinSpr, eggbertSpr, onionSpr, kongySpr, glacionSpr);
+    if (G.flags.secretSpared) lineup.push(chipsSpr);
+  } else if (route === "neutral"){
+    if (G.flags.kongySpared) lineup.push(kongySpr);
+    if (G.flags.bossSpared) lineup.push(glacionSpr);
+    if (G.flags.secretSpared) lineup.push(chipsSpr);
+  }
+  const gap = 6;
+  const totalW = lineup.reduce((a, s) => a + s.width, 0) + gap * (lineup.length - 1);
+  let lx = 160 - totalW / 2;
+  lineup.forEach((s, i) => {
+    const yo = Math.sin(G.t / 18 + i * 0.9) * 2;
+    drawSpr(s, lx, 96 - s.height + yo, {});
+    lx += s.width + gap;
+  });
+  const flavor = route === "pacifist" ? "EVERY SNACK IN THE FRIDGE CALLS YOU FRIEND."
+              : route === "violent" ? "IT'S QUIET. JUST THE THREE OF YOU, AND THE HUM."
+              : "SOME FRIENDS, SOME FOES, ALL FED.";
+  drawTextC(flavor, 160, 110, "#c9c9d8");
+  drawTextC(`SNACKS BEFRIENDED: ${G.spares}   SNACKS DEFEATED: ${G.kills}`, 160, 128, "#8a93a8");
+  drawTextC(`FINAL LV ${G.lv} - CRUMBS ${G.crumbs}`, 160, 140, "#8a93a8");
+  if (route === "pacifist") drawTextC("CLEANEST HANDS IN THE CRISPER!", 160, 154, "#58c858");
+  if (route === "violent") drawTextC("THE FRIDGE REMEMBERS.", 160, 154, "#9fd8f0");
+  if (G.flags.secretDone)
+    drawTextC(G.flags.secretSpared ? "CRISPUS KNOWS WHERE HE LIVES NOW." : "THE TOP SHELF IS SILENT.", 160, 166, "#e8a030");
+  drawTextC("THE MYTHICAL PIZZA ROLLS WERE REAL.", 160, 184, "#5a6078");
+  drawTextC("THANKS FOR PLAYING!", 160, 196, "#5a6078");
   if (G.endTimer > 90 && (G.t >> 4) % 2 === 0)
-    drawTextC("PRESS Z", 160, 204, "#ffe14a");
+    drawTextC("PRESS Z", 160, 212, "#ffe14a");
 }
 
 // ================= MAIN LOOP =================
