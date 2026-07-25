@@ -1,0 +1,2777 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>FRIDGE QUEST and the Mythical Pizza Rolls</title>
+<style>
+  html,body{margin:0;padding:0;background:#08080c;height:100%;overflow:hidden}
+  body{display:flex;align-items:center;justify-content:center}
+  canvas{image-rendering:pixelated;image-rendering:crisp-edges;outline:none}
+  #hint{position:fixed;bottom:6px;left:0;right:0;text-align:center;color:#39404f;
+        font:12px monospace;pointer-events:none;user-select:none}
+</style>
+</head>
+<body>
+<canvas id="screen"></canvas>
+<div id="hint">ARROWS/WASD move &nbsp; Z/ENTER confirm &nbsp; X cancel/run &nbsp; C menu &nbsp; M mute</div>
+<script>
+"use strict";
+/* ================================================================
+   FRIDGE QUEST and the Mythical Pizza Rolls
+   A single-file 2D RPG. Canvas + Web Audio, no dependencies.
+   ================================================================ */
+
+// ---------------- core constants / boot ----------------
+const W = 320, H = 240;
+const screenCv = document.getElementById("screen");
+const sctx = screenCv.getContext("2d");
+const vc = document.createElement("canvas"); vc.width = W; vc.height = H;
+const ctx = vc.getContext("2d");
+ctx.imageSmoothingEnabled = false;
+let SCALE = 2;
+function fitScreen(){
+  SCALE = Math.max(1, Math.floor(Math.min(innerWidth / W, (innerHeight - 20) / H)));
+  screenCv.width = W * SCALE; screenCv.height = H * SCALE;
+  sctx.imageSmoothingEnabled = false;
+}
+addEventListener("resize", fitScreen); fitScreen();
+
+// ---------------- utils ----------------
+const clamp = (v, a, b) => v < a ? a : (v > b ? b : v);
+const lerp = (a, b, t) => a + (b - a) * t;
+const rnd = (a, b) => a + Math.random() * (b - a);
+const irnd = (a, b) => Math.floor(rnd(a, b + 1));
+const dist = (x1, y1, x2, y2) => Math.hypot(x2 - x1, y2 - y1);
+const overlaps = (a, b) => a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
+const pick = arr => arr[Math.floor(Math.random() * arr.length)];
+
+// ---------------- input ----------------
+const held = {}, pressed = {};
+const KEYMAP = {
+  ArrowLeft:"left", KeyA:"left", ArrowRight:"right", KeyD:"right",
+  ArrowUp:"up", KeyW:"up", ArrowDown:"down", KeyS:"down",
+  KeyZ:"z", Enter:"z", Space:"z",
+  KeyX:"x", ShiftLeft:"x", ShiftRight:"x",
+  KeyC:"c", ControlLeft:"c", ControlRight:"c",
+  KeyM:"m"
+};
+addEventListener("keydown", e => {
+  const k = KEYMAP[e.code];
+  if (k){ e.preventDefault(); if (!held[k]) pressed[k] = true; held[k] = true; }
+  audioBoot();
+});
+addEventListener("keyup", e => {
+  const k = KEYMAP[e.code];
+  if (k){ held[k] = false; }
+});
+function eat(k){ pressed[k] = false; }
+function clearPressed(){ for (const k in pressed) pressed[k] = false; }
+
+// ---------------- 5x7 bitmap font ----------------
+const FONT = {
+  A:[14,17,17,31,17,17,17], B:[30,17,17,30,17,17,30], C:[14,17,16,16,16,17,14],
+  D:[30,17,17,17,17,17,30], E:[31,16,16,30,16,16,31], F:[31,16,16,30,16,16,16],
+  G:[14,17,16,23,17,17,15], H:[17,17,17,31,17,17,17], I:[14,4,4,4,4,4,14],
+  J:[7,2,2,2,2,18,12], K:[17,18,20,24,20,18,17], L:[16,16,16,16,16,16,31],
+  M:[17,27,21,21,17,17,17], N:[17,25,21,19,17,17,17], O:[14,17,17,17,17,17,14],
+  P:[30,17,17,30,16,16,16], Q:[14,17,17,17,21,18,13], R:[30,17,17,30,20,18,17],
+  S:[15,16,16,14,1,1,30], T:[31,4,4,4,4,4,4], U:[17,17,17,17,17,17,14],
+  V:[17,17,17,17,17,10,4], W:[17,17,17,21,21,21,10], X:[17,17,10,4,10,17,17],
+  Y:[17,17,10,4,4,4,4], Z:[31,1,2,4,8,16,31],
+  "0":[14,17,19,21,25,17,14], "1":[4,12,4,4,4,4,14], "2":[14,17,1,2,4,8,31],
+  "3":[31,2,4,2,1,17,14], "4":[2,6,10,18,31,2,2], "5":[31,16,30,1,1,17,14],
+  "6":[6,8,16,30,17,17,14], "7":[31,1,2,4,8,8,8], "8":[14,17,17,14,17,17,14],
+  "9":[14,17,17,15,1,2,12],
+  " ":[0,0,0,0,0,0,0], ".":[0,0,0,0,0,12,12], ",":[0,0,0,0,0,12,4],
+  "!":[4,4,4,4,4,0,4], "?":[14,17,1,2,4,0,4], "'":[4,4,8,0,0,0,0],
+  '"':[10,10,0,0,0,0,0], "-":[0,0,0,14,0,0,0], ":":[0,12,12,0,12,12,0],
+  ";":[0,12,12,0,12,4,8], "(":[2,4,8,8,8,4,2], ")":[8,4,2,2,2,4,8],
+  "/":[1,1,2,4,8,16,16], "+":[0,4,4,31,4,4,0], "%":[25,26,2,4,8,11,19],
+  "*":[0,4,21,14,21,4,0], "~":[0,0,13,22,0,0,0], "@":[10,31,31,31,14,4,0], // @ = heart
+  "_":[0,0,0,0,0,0,31], "=":[0,0,14,0,14,0,0]
+};
+const FONT_CHARS = Object.keys(FONT);
+const glyphAtlas = {}; // color -> canvas
+function atlasFor(color){
+  if (glyphAtlas[color]) return glyphAtlas[color];
+  const c = document.createElement("canvas");
+  c.width = FONT_CHARS.length * 6; c.height = 7;
+  const g = c.getContext("2d"); g.fillStyle = color;
+  FONT_CHARS.forEach((ch, i) => {
+    const rows = FONT[ch];
+    for (let y = 0; y < 7; y++)
+      for (let x = 0; x < 5; x++)
+        if (rows[y] >> (4 - x) & 1) g.fillRect(i * 6 + x, y, 1, 1);
+  });
+  glyphAtlas[color] = c; return c;
+}
+function drawText(s, x, y, color = "#ffffff"){
+  const at = atlasFor(color);
+  s = String(s).toUpperCase();
+  let cx = x | 0;
+  for (const ch of s){
+    const i = FONT_CHARS.indexOf(FONT[ch] ? ch : " ");
+    ctx.drawImage(at, i * 6, 0, 6, 7, cx, y | 0, 6, 7);
+    cx += 6;
+  }
+}
+function textW(s){ return String(s).length * 6; }
+function drawTextC(s, cx, y, color){ drawText(s, cx - textW(s) / 2, y, color); }
+// wrap text into lines of max chars
+function wrapText(s, maxChars){
+  const words = String(s).split(" "), lines = []; let cur = "";
+  for (const w of words){
+    if ((cur + (cur ? " " : "") + w).length <= maxChars) cur += (cur ? " " : "") + w;
+    else { if (cur) lines.push(cur); cur = w; }
+  }
+  if (cur) lines.push(cur);
+  return lines;
+}
+
+// rounded-ish retro window
+function drawBox(x, y, w, h, bg = "#000000", border = "#ffffff"){
+  ctx.fillStyle = border; ctx.fillRect(x, y, w, h);
+  ctx.fillStyle = bg; ctx.fillRect(x + 2, y + 2, w - 4, h - 4);
+}
+</script>
+<script>
+"use strict";
+// ================= AUDIO: chiptune engine =================
+let AC = null, masterGain = null, musicGain = null, sfxGain = null;
+let muted = false;
+function audioBoot(){
+  if (AC) { if (AC.state === "suspended") AC.resume(); return; }
+  try {
+    AC = new (window.AudioContext || window.webkitAudioContext)();
+  } catch (e) { return; }
+  masterGain = AC.createGain(); masterGain.gain.value = 0.55; masterGain.connect(AC.destination);
+  musicGain = AC.createGain(); musicGain.gain.value = 0.5; musicGain.connect(masterGain);
+  sfxGain = AC.createGain(); sfxGain.gain.value = 0.9; sfxGain.connect(masterGain);
+  makeNoiseBuf();
+  if (pendingSong) playMusic(pendingSong);
+}
+function toggleMute(){
+  muted = !muted;
+  if (masterGain) masterGain.gain.value = muted ? 0 : 0.55;
+}
+let noiseBuf = null;
+function makeNoiseBuf(){
+  noiseBuf = AC.createBuffer(1, AC.sampleRate * 0.5, AC.sampleRate);
+  const d = noiseBuf.getChannelData(0);
+  for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+}
+const NOTE_RE = /^([A-G])(#?)(\d)$/;
+function midiOf(tok){
+  const m = NOTE_RE.exec(tok); if (!m) return null;
+  const base = { C:0, D:2, E:4, F:5, G:7, A:9, B:11 }[m[1]] + (m[2] ? 1 : 0);
+  return 12 * (Number(m[3]) + 1) + base;
+}
+const freqOf = midi => 440 * Math.pow(2, (midi - 69) / 12);
+
+// --- one-shot tone helper (SFX) ---
+function tone(freq, dur, wave = "square", vol = 0.25, slideTo = 0, delay = 0, dest = null){
+  if (!AC || muted) return;
+  const t0 = AC.currentTime + delay;
+  const o = AC.createOscillator(), g = AC.createGain();
+  o.type = wave; o.frequency.setValueAtTime(freq, t0);
+  if (slideTo) o.frequency.exponentialRampToValueAtTime(Math.max(20, slideTo), t0 + dur);
+  g.gain.setValueAtTime(vol, t0);
+  g.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
+  o.connect(g); g.connect(dest || sfxGain);
+  o.start(t0); o.stop(t0 + dur + 0.02);
+}
+function noiseHit(dur, vol = 0.3, rate = 1, delay = 0, dest = null){
+  if (!AC || muted || !noiseBuf) return;
+  const t0 = AC.currentTime + delay;
+  const s = AC.createBufferSource(); s.buffer = noiseBuf; s.playbackRate.value = rate;
+  const g = AC.createGain();
+  g.gain.setValueAtTime(vol, t0); g.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
+  s.connect(g); g.connect(dest || sfxGain);
+  s.start(t0); s.stop(t0 + dur + 0.02);
+}
+
+// --- SFX library ---
+const SFX = {
+  blip(){ tone(540, 0.045, "square", 0.12); },
+  blip2(){ tone(300, 0.05, "square", 0.12); },
+  move(){ tone(880, 0.03, "square", 0.08); },
+  confirm(){ tone(660, 0.05, "square", 0.14); tone(990, 0.07, "square", 0.12, 0, 0.05); },
+  cancel(){ tone(440, 0.08, "square", 0.12, 220); },
+  interact(){ tone(520, 0.05, "triangle", 0.2); },
+  hitEnemy(){ tone(320, 0.12, "square", 0.25, 70); noiseHit(0.08, 0.2, 1.4); },
+  slash(){ noiseHit(0.1, 0.22, 2.4); },
+  hurt(){ tone(240, 0.22, "sawtooth", 0.28, 55); noiseHit(0.15, 0.3, 0.7); },
+  graze(){ tone(1560, 0.035, "triangle", 0.1); },
+  tp(){ tone(1200, 0.05, "square", 0.09, 1500); },
+  heal(){ [523, 659, 784, 1047].forEach((f, i) => tone(f, 0.09, "triangle", 0.18, 0, i * 0.06)); },
+  spare(){ tone(1319, 0.12, "triangle", 0.2); tone(1568, 0.2, "triangle", 0.2, 0, 0.1); },
+  spell(){ tone(200, 0.3, "sawtooth", 0.2, 900); noiseHit(0.2, 0.12, 2); },
+  levelup(){ [392, 523, 659, 784, 1047].forEach((f, i) => tone(f, 0.12, "square", 0.15, 0, i * 0.07)); },
+  save(){ [784, 988, 1175, 1568].forEach((f, i) => tone(f, 0.1, "triangle", 0.16, 0, i * 0.08)); },
+  shatter(){ noiseHit(0.4, 0.35, 1.8); [880, 700, 520, 340].forEach((f, i) => tone(f, 0.15, "square", 0.2, f * 0.5, 0.1 + i * 0.12)); },
+  boom(){ noiseHit(0.5, 0.4, 0.5); tone(90, 0.5, "sawtooth", 0.3, 40); },
+  fall(){ tone(1200, 0.8, "square", 0.15, 90); },
+  encounter(){ tone(700, 0.1, "square", 0.2, 350); tone(700, 0.1, "square", 0.2, 350, 0.12); },
+  miss(){ tone(180, 0.1, "square", 0.12, 120); },
+  eat(){ tone(160, 0.06, "square", 0.18); tone(120, 0.06, "square", 0.18, 0, 0.08); tone(200, 0.08, "square", 0.15, 0, 0.16); }
+};
+
+// --- music sequencer ---
+// Sequences: tokens on an 8th-note grid. "." = rest, "~" = hold previous note.
+function parseSeq(seq){
+  const toks = seq.trim().split(/\s+/), ev = [];
+  for (let i = 0; i < toks.length; i++){
+    if (toks[i] === "." || toks[i] === "~") continue;
+    const m = midiOf(toks[i]); if (m === null) continue;
+    let d = 1; while (toks[i + d] === "~") d++;
+    ev.push({ step: i, midi: m, dur: d });
+  }
+  return { events: ev, len: toks.length };
+}
+
+const SONGS = {
+  // Crisper Village — warm and bouncy, C major
+  town: {
+    bpm: 104, tracks: [
+      { wave: "square", vol: 0.10, seq:
+        "E5 ~  G5 C6 B5 ~  G5 E5 A5 ~  G5 A5 G5 ~  E5 C5 D5 ~  E5 F5 E5 ~  D5 B4 C5 ~  ~  .  G4 A4 B4 C5 " +
+        "E5 ~  G5 C6 B5 ~  G5 E5 A5 ~  C6 A5 G5 ~  E5 G5 A5 ~  B5 A5 G5 F5 E5 D5 C5 ~  ~  ~  .  .  .  ." },
+      { wave: "square", vol: 0.05, seq:
+        "C4 .  E4 .  D4 .  E4 .  F4 .  E4 .  E4 .  C4 .  A3 .  C4 .  B3 .  C4 .  G3 .  G3 .  E4 .  D4 . " +
+        "C4 .  E4 .  D4 .  E4 .  F4 .  F4 .  E4 .  E4 .  D4 .  D4 .  G4 .  F4 .  E4 ~  C4 ~  .  .  .  ." },
+      { wave: "triangle", vol: 0.22, seq:
+        "C3 .  G3 .  C3 .  G3 .  F2 .  C3 .  A2 .  E3 .  F2 .  C3 .  G2 .  G3 .  C3 .  G3 .  C3 .  G2 . " +
+        "C3 .  G3 .  C3 .  G3 .  F2 .  C3 .  A2 .  E3 .  D3 .  A3 .  G2 .  G3 .  C3 ~  C3 ~  C3 .  G2 ." },
+    ],
+    noise: "h . h . h . h h h . h . h . h . h . h . h . h h h . h . h . h . " +
+           "h . h . h . h h h . h . h . h . h . h . h . h h h . h . h . h ."
+  },
+  // Freezer Depths — slow, sparse, eerie
+  freezer: {
+    bpm: 76, tracks: [
+      { wave: "triangle", vol: 0.20, seq:
+        "D4 ~  ~  ~  F4 ~  ~  ~  E4 ~  ~  ~  C4 ~  ~  ~  D4 ~  ~  ~  A4 ~  ~  ~  G4 ~  ~  E4 D4 ~  ~  ~" },
+      { wave: "square", vol: 0.05, seq:
+        ".  .  D5 .  .  .  A4 .  .  .  C5 .  .  .  G4 .  .  .  D5 .  .  .  F5 .  .  .  E5 .  .  .  A4 ." },
+      { wave: "triangle", vol: 0.22, seq:
+        "D2 ~  ~  ~  ~  ~  ~  ~  A1 ~  ~  ~  ~  ~  ~  ~  B1 ~  ~  ~  ~  ~  ~  ~  A1 ~  ~  ~  G1 ~  ~  ~" },
+    ],
+    noise: ". . . . h . . . . . . . h . . . . . . . h . . . . . . . h . . ."
+  },
+  // Battle — driving A minor
+  battle: {
+    bpm: 140, tracks: [
+      { wave: "square", vol: 0.11, seq:
+        "A4 A4 C5 D5 E5 ~  D5 C5 D5 ~  C5 D5 E5 ~  G5 E5 F5 ~  E5 D5 E5 ~  C5 A4 B4 ~  C5 B4 G4 ~  E4 ~ " +
+        "A4 A4 C5 D5 E5 ~  G5 A5 G5 ~  E5 D5 E5 ~  C5 D5 E5 F5 E5 D5 C5 ~  A4 C5 B4 ~  ~  ~  A4 ~  .  ." },
+      { wave: "square", vol: 0.06, seq:
+        "E4 .  A4 .  C5 .  A4 .  B4 .  A4 .  B4 .  C5 .  C5 .  B4 .  C5 .  A4 .  A4 .  G4 .  E4 .  B3 . " +
+        "E4 .  A4 .  C5 .  E5 .  B4 .  B4 .  C5 .  D5 .  C5 .  B4 .  A4 .  F4 .  E4 .  E4 .  E4 .  .  ." },
+      { wave: "triangle", vol: 0.24, seq:
+        "A2 A2 E3 A2 A2 A2 E3 A2 F2 F2 C3 F2 F2 F2 C3 F2 G2 G2 D3 G2 G2 G2 D3 G2 E2 E2 B2 E2 E2 E2 B2 E2 " +
+        "A2 A2 E3 A2 A2 A2 E3 A2 F2 F2 C3 F2 F2 F2 C3 F2 D2 D2 A2 D2 E2 E2 B2 E2 A2 A2 E3 A2 A2 E2 A2 A2" },
+    ],
+    noise: "k . h . s . h h k . h . s . h . k . h . s . h h k . h . s . h h " +
+           "k . h . s . h h k . h . s . h . k . h . s . h h k . s . s . s s"
+  },
+  // Boss — frantic D minor
+  boss: {
+    bpm: 152, tracks: [
+      { wave: "square", vol: 0.11, seq:
+        "D5 ~  ~  C5 D5 ~  F5 ~  E5 ~  ~  D5 E5 ~  G5 ~  F5 ~  ~  E5 F5 ~  A5 ~  G5 F5 E5 D5 C5 D5 E5 C5 " +
+        "D5 ~  ~  C5 D5 ~  F5 ~  A5 ~  ~  G5 A5 ~  C6 ~  A5 G5 F5 E5 F5 E5 D5 C5 D5 ~  ~  ~  D5 ~  .  ." },
+      { wave: "sawtooth", vol: 0.05, seq:
+        "D4 F4 A4 F4 D4 F4 A4 F4 C4 E4 G4 E4 C4 E4 G4 E4 A3 D4 F4 D4 A3 D4 F4 D4 A3 C4 E4 C4 A3 C4 E4 C4 " +
+        "D4 F4 A4 F4 D4 F4 A4 F4 A3 D4 F4 D4 B3 D4 G4 D4 A3 C4 F4 C4 G3 C4 E4 C4 D4 A4 D5 A4 D4 F4 D4 A3" },
+      { wave: "triangle", vol: 0.24, seq:
+        "D2 D2 D3 D2 D2 D3 D2 D2 C2 C2 C3 C2 C2 C3 C2 C2 B1 B1 B2 B1 B1 B2 B1 B1 A1 A1 A2 A1 A1 A2 A1 A1 " +
+        "D2 D2 D3 D2 D2 D3 D2 D2 B1 B1 B2 B1 B1 B2 B1 B1 A1 A1 A2 A1 G1 G1 G2 G1 D2 D2 D3 D2 D2 D2 D3 D3" },
+    ],
+    noise: "k . s . k k s . k . s . k k s h k . s . k k s . k . s . k s s s " +
+           "k . s . k k s . k . s . k k s h k . s . k k s . k k s s k s k s"
+  }
+};
+
+let curSong = null, songTimer = null, songStep = 0, nextStepT = 0, pendingSong = null;
+let parsedSongs = {};
+function playMusic(name){
+  pendingSong = name;
+  if (!AC) return;
+  if (curSong === name && songTimer) return;
+  stopMusic();
+  if (!name || !SONGS[name]) return;
+  curSong = name;
+  if (!parsedSongs[name]){
+    const s = SONGS[name];
+    parsedSongs[name] = {
+      bpm: s.bpm,
+      tracks: s.tracks.map(t => ({ wave: t.wave, vol: t.vol, ...parseSeq(t.seq) })),
+      noise: s.noise ? s.noise.trim().split(/\s+/) : null
+    };
+  }
+  songStep = 0; nextStepT = AC.currentTime + 0.08;
+  songTimer = setInterval(musicTick, 30);
+}
+function stopMusic(){
+  if (songTimer){ clearInterval(songTimer); songTimer = null; }
+  curSong = null; pendingSong = null;
+}
+function musicTick(){
+  if (!AC || !curSong) return;
+  const song = parsedSongs[curSong];
+  const stepDur = 30 / song.bpm; // 8th note
+  while (nextStepT < AC.currentTime + 0.15){
+    const t0 = nextStepT;
+    for (const tr of song.tracks){
+      const st = songStep % tr.len;
+      for (const ev of tr.events){
+        if (ev.step !== st) continue;
+        if (muted) continue;
+        const o = AC.createOscillator(), g = AC.createGain();
+        o.type = tr.wave; o.frequency.value = freqOf(ev.midi);
+        const durS = ev.dur * stepDur;
+        g.gain.setValueAtTime(0.0001, t0);
+        g.gain.linearRampToValueAtTime(tr.vol, t0 + 0.01);
+        g.gain.setValueAtTime(tr.vol, t0 + Math.max(0.01, durS - 0.04));
+        g.gain.linearRampToValueAtTime(0.0001, t0 + durS);
+        o.connect(g); g.connect(musicGain);
+        o.start(t0); o.stop(t0 + durS + 0.03);
+      }
+    }
+    if (song.noise && !muted){
+      const n = song.noise[songStep % song.noise.length];
+      if (n === "h") noiseAt(t0, 0.03, 0.10, 2.6);
+      else if (n === "s") noiseAt(t0, 0.09, 0.22, 1.2);
+      else if (n === "k"){ noiseAt(t0, 0.05, 0.18, 0.4);
+        const o = AC.createOscillator(), g = AC.createGain();
+        o.type = "triangle"; o.frequency.setValueAtTime(110, t0);
+        o.frequency.exponentialRampToValueAtTime(45, t0 + 0.09);
+        g.gain.setValueAtTime(0.3, t0); g.gain.exponentialRampToValueAtTime(0.001, t0 + 0.09);
+        o.connect(g); g.connect(musicGain); o.start(t0); o.stop(t0 + 0.1);
+      }
+    }
+    songStep++;
+    nextStepT += stepDur;
+  }
+}
+function noiseAt(t0, dur, vol, rate){
+  const s = AC.createBufferSource(); s.buffer = noiseBuf; s.playbackRate.value = rate;
+  const g = AC.createGain();
+  g.gain.setValueAtTime(vol, t0); g.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
+  s.connect(g); g.connect(musicGain); s.start(t0); s.stop(t0 + dur + 0.02);
+}
+function playJingle(kind){
+  stopMusic();
+  if (kind === "victory") [523, 523, 523, 659, 784, 1047].forEach((f, i) => tone(f, i >= 4 ? 0.3 : 0.09, "square", 0.16, 0, i * 0.1));
+  if (kind === "gameover") [440, 415, 392, 370].forEach((f, i) => tone(f, 0.5, "triangle", 0.2, f * 0.98, i * 0.45));
+}
+</script>
+<script>
+"use strict";
+// ================= SPRITES: procedural pixel art =================
+// Build a canvas from ASCII rows + palette. Unknown/'.'/' ' chars = transparent.
+function S(rows, pal){
+  const h = rows.length, w = Math.max(...rows.map(r => r.length));
+  const c = document.createElement("canvas"); c.width = w; c.height = h;
+  const g = c.getContext("2d");
+  for (let y = 0; y < h; y++)
+    for (let x = 0; x < rows[y].length; x++){
+      const col = pal[rows[y][x]];
+      if (col){ g.fillStyle = col; g.fillRect(x, y, 1, 1); }
+    }
+  return c;
+}
+function drawSpr(cv, x, y, o = {}){
+  const sc = o.scale || 1;
+  ctx.save();
+  ctx.translate((x + (o.flip ? cv.width * sc : 0)) | 0, y | 0);
+  if (o.flip) ctx.scale(-1, 1);
+  if (o.alpha !== undefined) ctx.globalAlpha = o.alpha;
+  ctx.drawImage(cv, 0, 0, cv.width * sc, cv.height * sc);
+  ctx.restore();
+}
+
+// ---- party: DORKO (koopa, green afro, triangle shades, orange shell) ----
+const dorkoPal = { a:"#35b04a", d:"#1f7a31", y:"#ffd75e", s:"#14141c", o:"#f08a24",
+                   r:"#b35c12", c:"#ffedbe", k:"#14141c", f:"#d8b23e" };
+const dorkoFront = S([
+"....aaaaaaaa....",
+"..aaaaaaaaaaaa..",
+".aaaaadaaaadaaa.",
+".adaaaaaaaaaaaa.",
+".aaaaaadaaaaada.",
+"..aaaaaaaaaaaa..",
+"..yyyyyyyyyyyy..",
+".yysssssssssssy.",
+".yy.sss..sss.yy.",
+".yy..s....s..yy.",
+".yyyyyyyyyyyyyy.",
+"..yy.kkkkkk.yy..",
+"..occcccccccco..",
+"yooccooooooccooy",
+"yoooooorrooooooy",
+".oorooooooooroo.",
+"..oooooooooooo..",
+"..cccccccccccc..",
+"...ff......ff...",
+"..fff......fff..",
+], dorkoPal);
+const dorkoBack = S([
+"....aaaaaaaa....",
+"..aaaaaaaaaaaa..",
+".aaaaadaaaadaaa.",
+".adaaaaaaaaaaaa.",
+".aaaaaadaaaaada.",
+"..aaaaaaaaaaaa..",
+"..aaaaaaaaaaaa..",
+"..cccccccccccc..",
+".cooooooooooooc.",
+"ycoorrooooorrocy",
+"ycoorooooooorocy",
+".cooooorroooooc.",
+".coorooooooroo c",
+".coooooooooooo c",
+"..oooooooooooo..",
+"..cccccccccccc..",
+"...ff......ff...",
+"..fff......fff..",
+], dorkoPal);
+
+// ---- party: MEGAFIRE (blue ushanka, brown hair, blue scarf/clothes) ----
+const megaPal = { b:"#3a6fd8", B:"#25459c", h:"#7a4a22", y:"#f5c9a2",
+                  s:"#6fb0ec", t:"#3a6fd8", p:"#25459c", k:"#14141c" };
+const megaFront = S([
+".....bbbbbb.....",
+"....bbbbbbbb....",
+"...bbbbbbbbbb...",
+"..bBbbbbbbbbBb..",
+"..bb.hhhhhh.bb..",
+"..bb.yyyyyy.bb..",
+"..bb.ykyyky.bb..",
+"..BB.yyyyyy.BB..",
+".....yykkyy.....",
+"....ssssssss....",
+"...ssssssssss...",
+"....sttttttss...",
+"...tttttttttss..",
+".yyttttttttttyy.",
+"...tttttttttt...",
+"...pppppppppp...",
+"...pppp..pppp...",
+"...pppp..pppp...",
+"..BBBp....pBBB..",
+"..BBB......BBB..",
+], megaPal);
+const megaBack = S([
+".....bbbbbb.....",
+"....bbbbbbbb....",
+"...bbbbbbbbbb...",
+"..bBbbbbbbbbBb..",
+"..bb.bbbbbb.bb..",
+"..bb.bbbbbb.bb..",
+"..bb.hhhhhh.bb..",
+"..BB.hhhhhh.BB..",
+".....hhhhhh.....",
+"....ssssssss....",
+"...ssssssssss...",
+"...sstttttts....",
+"..sstttttttt....",
+".yyttttttttttyy.",
+"...tttttttttt...",
+"...pppppppppp...",
+"...pppp..pppp...",
+"...pppp..pppp...",
+"..BBBp....pBBB..",
+"..BBB......BBB..",
+], megaPal);
+
+// ---- party: BMO (teal handheld with wizard hat) ----
+const bmoPal = { P:"#8a4ad8", Q:"#5c2e96", Y:"#ffe14a", g:"#6fd8c0", G:"#3f9e8a",
+                 e:"#d8ffe8", k:"#14504a", R:"#e05858", U:"#5878e0" };
+const bmoFront = S([
+".......PP.......",
+"......PPPP......",
+".....PPYPPP.....",
+"....PPPPPPPP....",
+"...PPPPPPPPPP...",
+"..QQQQQQQQQQQQ..",
+"..gggggggggggg..",
+"..geeeeeeeeeeg..",
+"..geekeeeekeeg..",
+"..geeeeeeeeeeg..",
+"g.geeekkkkeeeg.g",
+"..gggggggggggg..",
+"..gggRgggYgggg..",
+"..gUUgggggRRgg..",
+"..gggggggggggg..",
+"..GGGGGGGGGGGG..",
+"...GG......GG...",
+"...GG......GG...",
+], bmoPal);
+const bmoBack = S([
+".......PP.......",
+"......PPPP......",
+".....PPPPPP.....",
+"....PPPPPPPP....",
+"...PPPPPPPPPP...",
+"..QQQQQQQQQQQQ..",
+"..gggggggggggg..",
+"..gGGGGGGGGGGg..",
+"..gGGGGGGGGGGg..",
+"..gGGGGGGGGGGg..",
+"g.gGGGGGGGGGGg.g",
+"..gggggggggggg..",
+"..gggggggggggg..",
+"..gggggggggggg..",
+"..gggggggggggg..",
+"..GGGGGGGGGGGG..",
+"...GG......GG...",
+"...GG......GG...",
+], bmoPal);
+
+// ---- enemies ----
+const gherkinSpr = S([
+"....gggg...t",
+"...gggggg..t",
+"..gwggggwg.t",
+"..gkggggkg.t",
+"..gggggggg.t",
+"..gggkkggg.t",
+"..glgggglg.t",
+"..gggggggg.t",
+"..ggglgggg.t",
+"..dggggggd.t",
+"..dggggggd.t",
+"..dggggggd.t",
+"...dggggd..t",
+"...dggggd..t",
+"....dggd....",
+"...dddddd...",
+], { g:"#5da33c", d:"#3f7a28", l:"#8ecf5e", k:"#14141c", w:"#ffffff", t:"#c9a56a" });
+
+const eggbertSpr = S([
+"....wwww....",
+"...wwwwww...",
+"..mmmmmmmm..",
+".mmmmmmmmmm.",
+".mMMMMMMMMm.",
+".mMkMMMMkMm.",
+".mMMMMMMMMm.",
+"..wwwwwwww..",
+".wwwwwwwwww.",
+".wwwwwwwwss.",
+".wwwwwwwwss.",
+".swwwwwwwss.",
+"..swwwwwss..",
+"...ssssss...",
+], { w:"#f2ede2", s:"#cfc7b8", m:"#8a93a8", M:"#5a6378", k:"#14141c" });
+
+const onionSpr = S([
+"....p.p.....",
+".....pp.....",
+"....oooo....",
+"..oooooooo..",
+".oooiiiiooo.",
+".oiioooiioo.",
+"oookoooookoo",
+"oooooooooooo",
+"ooobookkoooo",
+".oooooooooo.",
+".oooooooooo.",
+"..oooooooo..",
+"...oooooo...",
+"....oooo....",
+], { o:"#c9995c", i:"#e8c99a", k:"#14141c", b:"#4a90d8", p:"#7ab04a" });
+
+const kongySpr = S([
+".....CCCCCCCC.....",
+"....CCCCCCCCCC....",
+"....CkkCCCCkkC....",
+"....CCFFFFFFCC....",
+"....CFFFkkFFFC....",
+"....CFkkkkkkFC....",
+".....CCCCCCCC.....",
+"..CCCCCCCCCCCCCC..",
+".CCCCDCCCCCCDCCCC.",
+".CCCCHHCCHHCCCCCC.",
+"CCCCCHHCCHHCCCCCCC",
+"CCCCCCCCCCCCCCCCCC",
+"DCCCCCCCCCCCCCCCCD",
+".DCCCCCCCCCCCCCCD.",
+".DDCCCCCCCCCCCCDD.",
+".DDD.CCCCCCCC.DDD.",
+".DDD.DCCCCCCD.DDD.",
+"......DDDDDD......",
+], { C:"#e8c25c", D:"#a8823c", F:"#f2dfa0", H:"#c9a244", k:"#14141c" });
+
+const glacionSpr = S([
+"..G....G.....G....G...",
+"..G...GG..G..GG...G...",
+"..GG..GG.GGG.GG..GG...",
+"..GGGGGGGGGGGGGGGGG...",
+"..BBBBBBBBBBBBBBBBB...",
+"..BIIIIIIIIIIIIIIIB...",
+"..BIIIIIIIIIIIIIIIB...",
+"..BIIkkIIIIIIIkkIIB...",
+"..BIIkkIIIIIIIkkIIB...",
+"..BIIIIIIIIIIIIIIIB...",
+"..BIIIIIkkkkkIIIIIB...",
+"..BIIIIkIIIIIkIIIIB...",
+"..BIIiIIIiIIIIIiIIB...",
+"..BIiiIiiiIiiIiiiIB...",
+"..BIiiIiiiIiiIiiiIB...",
+"..BIi.Iii.Ii.Iii.IB...",
+"..BI..Ii..I..Ii..IB...",
+"..BIIIIIIIIIIIIIIIB...",
+"..BTTTTTTBTTTTTTTTB...",
+"..BTiiiiTBTiiiiiiTB...",
+"..BTiiiiTBTiiiiiiTB...",
+"..BTTTTTTBTTTTTTTTB...",
+"..BBBBBBBBBBBBBBBBB...",
+"...BB....BB.....BB....",
+], { G:"#ffd75e", B:"#3a5f8c", I:"#9fd8f0", i:"#e0f4ff", k:"#14141c", T:"#5f88ad" });
+
+// ---- NPCs ----
+const cabbagePal = { g:"#7ac04a", d:"#4f8c2e", l:"#a8e07a", k:"#14141c", m:"#ffd75e", w:"#ffffff" };
+const cabbageSpr = S([
+"...ldglldgl...",
+"..gglggglgg...",
+".gggggggggggg.",
+".dggggggggggd.",
+"gggwmgggkgggg.",
+"ggg kmggggggg.",
+"gggwmgggggggg.",
+".ggggkkkggggg.",
+".dgggggggggd..",
+".ldddgggdddl..",
+"..lldddddll...",
+"...llllll.....",
+], cabbagePal);
+const milkSpr = S([
+"...wwwwww...",
+"..wwwwwwww..",
+".wsssssssss.",
+".wwwwwwwwww.",
+".wbbbbbbbbw.",
+".wbwwwwwwbw.",
+".wwwwwwwwww.",
+".wwkwwwwkww.",
+".wwwwwwwwww.",
+".wwwkkkwwww.",
+".wwwwwwwwww.",
+".wwwwwwwwww.",
+".ssssssssss.",
+], { w:"#f2f2ee", s:"#c9c9c2", b:"#4a7ec0", k:"#14141c" });
+const baguettePal = { b:"#d8a45c", d:"#a87838", r:"#c05858", k:"#14141c" };
+const baguetteSpr = S([
+"...rrrrr..",
+"..rrrrrrr.",
+"...bbbb...",
+"..bkbbkb..",
+"..bbbbbb..",
+"..bkkbbb..",
+"..bbbbbb..",
+".bbdbbbb..",
+".bbbbdbb..",
+".bbdbbbb..",
+".bbbbbdb..",
+".bbdbbbb..",
+"..bbbbb...",
+"..dbbbd...",
+"...ddd....",
+], baguettePal);
+const yogurtSpr = S([
+".LLLLLLLL.",
+"LLLLLLLLLL",
+".YYYYYYYY.",
+".YkYYYYkY.",
+".YYYYYYYY.",
+".YYkkkYYY.",
+".YYYYYYYY.",
+".YYYYYYYY.",
+"..YYYYYY..",
+"..dddddd..",
+], { L:"#f8f0f8", Y:"#f0a8c0", d:"#c07890", k:"#14141c" });
+const tomatoSpr = S([
+"....pp....",
+"...ppp....",
+"..RRRRRR..",
+".RRRRRRRR.",
+"RRkRRRRkRR",
+"RRRRRRRRRR",
+"RRRkkkkRRR",
+".RRRRRRRR.",
+"..RRRRRR..",
+"...RRRR...",
+], { R:"#e05840", p:"#5f9c3a", k:"#14141c" });
+const butterSpr = S([
+".BBBBBBBBBBBB.",
+"BBBBBBBBBBBBBB",
+"BkkBBBBBBBkkBB",
+"BBBBBBBBBBBBBB",
+"BBBBkkkkkBBBBB",
+"BBBBBBBBBBBBBB",
+"DBBBBBBBBBBBBD",
+"DDBBBBBBBBBBDD",
+"BB.DDDDDDDD.BB",
+"BB..........BB",
+], { B:"#f5d858", D:"#c9a838", k:"#14141c" });
+
+// save point sparkle (2 frames)
+const saveSpr1 = S([
+"....y....",
+"....y....",
+"..y.w.y..",
+"...www...",
+"yww*wwwy.",
+"...www...",
+"..y.w.y..",
+"....y....",
+"....y....",
+], { y:"#ffe14a", w:"#fff8d0", "*":"#ffffff" });
+const saveSpr2 = S([
+".........",
+"....y....",
+"...ywy...",
+"..ywwwy..",
+".ywwwwwy.",
+"..ywwwy..",
+"...ywy...",
+"....y....",
+".........",
+], { y:"#ffe14a", w:"#fff8d0" });
+
+// pizza roll + shrine
+const rollSpr = S([
+"..pppppp..",
+".pPPPPPPp.",
+"pPPbPPPbPp",
+"pPPPPbPPPp",
+".pPPPPPPp.",
+"..pppppp..",
+], { p:"#c07830", P:"#f5cd7a", b:"#e0a23c" });
+const shrineSpr = S([
+"....mmmmmmmm....",
+"...mIIIIIIIIm...",
+"...mIIIIIIIIm...",
+"....mmmmmmmm....",
+"......mmmm......",
+"......mmmm......",
+"....mmmmmmmm....",
+"..mmmmmmmmmmmm..",
+], { m:"#8ca8c0", I:"#c8e8f8" });
+
+// soul heart (battle cursor)
+const soulSpr = S([
+".rr.rr.",
+"rrrrrrr",
+"rrrrrrr",
+".rrrrr.",
+"..rrr..",
+"...r...",
+], { r:"#e03050" });
+
+// ---- portraits (28x28-ish) ----
+const dorkoPort = S([
+"....aaaaaaaaaaaaaaaa....",
+"..aaaaaaaaaaaaaaaaaaaa..",
+".aaaaadaaaaaaaadaaaaaaa.",
+".adaaaaaaadaaaaaaaaaada.",
+"aaaaadaaaaaaaaadaaaaaaaa",
+"aaaaaaaaaadaaaaaaaadaaaa",
+"aadaaaaaaaaaaaaaaaaaaaaa",
+".aaaaaaadaaaaaadaaaaaaa.",
+"..aaaaaaaaaaaaaaaaaaaa..",
+"..yyyyyyyyyyyyyyyyyyyy..",
+".yyssssssssssssssssssyy.",
+".yysssssssssyssssssssyy.",
+".yy.sssssss..sssssss.yy.",
+".yy..sssss....sssss..yy.",
+".yy...sss......sss...yy.",
+".yy....s........s....yy.",
+".yyyyyyyyyyyyyyyyyyyyyy.",
+".yyyyyyyyyyyyyyyyyyyyyy.",
+"..yyyk............kyyy..",
+"..yyyykk........kkyyy...",
+"...yyyyykkkkkkkkyyyy....",
+"....yyyyyyyyyyyyyyy.....",
+"......yyyyyyyyyyy.......",
+"........................",
+], dorkoPal);
+const megaPort = S([
+"......bbbbbbbbbbbb......",
+"....bbbbbbbbbbbbbbbb....",
+"...bbbbbbbbbbbbbbbbbb...",
+"..bbbbbbbbbbbbbbbbbbbb..",
+"..bBbbbbbbbbbbbbbbbbBb..",
+"..bbb.hhhhhhhhhhhh.bbb..",
+"..bbb.hhhhhhhhhhhh.bbb..",
+"..bbb.yyyyyyyyyyyy.bbb..",
+"..bbb.yyyyyyyyyyyy.bbb..",
+"..bbb.ykkyyyyyykky.bbb..",
+"..bbb.ykkyyyyyykky.bbb..",
+"..BBB.yyyyyyyyyyyy.BBB..",
+"..BBB.yyyyyyyyyyyy.BBB..",
+"..BBB.yyykkkkkkyyy.BBB..",
+"......yyyyyyyyyyyy......",
+"....ssssssssssssssss....",
+"...ssssssssssssssssss...",
+"..ssssssssssssssssssss..",
+"..sssssssssssssssttss...",
+"....sssssssssssssss.....",
+"........................",
+], megaPal);
+const bmoPort = S([
+"...........PPP..........",
+"..........PPPPP.........",
+".........PPPYPPP........",
+"........PPPPPPPPP.......",
+"......PPPPPPPPPPPPP.....",
+"....PPPPPPPPPPPPPPPPP...",
+"..QQQQQQQQQQQQQQQQQQQQ..",
+"..gggggggggggggggggggg..",
+"..geeeeeeeeeeeeeeeeeeg..",
+"..geeeeeeeeeeeeeeeeeeg..",
+"..geekkeeeeeeeeeekkeeg..",
+"..geekkeeeeeeeeeekkeeg..",
+"..geeeeeeeeeeeeeeeeeeg..",
+"..geeeeekeeeeeekeeeeeg..",
+"..geeeeeekkkkkkeeeeeeg..",
+"..geeeeeeeeeeeeeeeeeeg..",
+"..gggggggggggggggggggg..",
+"..gggRRggggYYggggUUggg..",
+"..gggggggggggggggggggg..",
+"..GGGGGGGGGGGGGGGGGGGG..",
+"........................",
+], bmoPal);
+const kongyPort = S([
+"......CCCCCCCCCCCC......",
+"....CCCCCCCCCCCCCCCC....",
+"...CCCCCCCCCCCCCCCCCC...",
+"..CCCkkkCCCCCCCCkkkCCC..",
+"..CCCkkkCCCCCCCCkkkCCC..",
+"..CCCCCCFFFFFFFFCCCCCC..",
+"..CCCFFFFFFFFFFFFFFCC...",
+"..CCFFFFFFFFFFFFFFFFC...",
+"..CCFFFkkFFFFFFkkFFFC...",
+"..CCFFFkkFFFFFFkkFFFC...",
+"..CCFFFFFFFFFFFFFFFFC...",
+"..CCFFFFFkkkkkkFFFFFC...",
+"..CCFFFFkkkkkkkkFFFFC...",
+"..CCFFFFkFFFFFFkFFFFC...",
+"..CCFFFFkkkkkkkkFFFFC...",
+"..CCCFFFFFFFFFFFFFFCC...",
+"...CCCFFFFFFFFFFFFCC....",
+"....CCCCCCCCCCCCCCC.....",
+"........................",
+], { C:"#e8c25c", F:"#f2dfa0", k:"#14141c" });
+const glacPort = S([
+"..G....G......G.....G...",
+"..G...GG..GG..GG....G...",
+"..GG..GG..GG..GG...GG...",
+"..GGGGGGGGGGGGGGGGGGG...",
+"..BBBBBBBBBBBBBBBBBBB...",
+"..BIIIIIIIIIIIIIIIIIB...",
+"..BIIIIIIIIIIIIIIIIIB...",
+"..BIIkkkIIIIIIIkkkIIB...",
+"..BIIIkkkIIIIIkkkIIIB...",
+"..BIIIIIIIIIIIIIIIIIB...",
+"..BIIIIIIkkkkkIIIIIIB...",
+"..BIIIIIkIIIIIkIIIIIB...",
+"..BIIiIIIIiIIIIIiIIIB...",
+"..BIiiiIIiiiIIIiiiIIB...",
+"..BIiiiIIiiiIIIiiiIIB...",
+"..BIii.IIii.III.ii.IB...",
+"..BIi..IIi..III.i..IB...",
+"..BIIIIIIIIIIIIIIIIIB...",
+"..BBBBBBBBBBBBBBBBBBB...",
+"........................",
+], { G:"#ffd75e", B:"#3a5f8c", I:"#9fd8f0", i:"#e0f4ff", k:"#14141c" });
+
+const PORTRAITS = { dorko: dorkoPort, mega: megaPort, bmo: bmoPort, kongy: kongyPort, glacion: glacPort };
+
+// walking bob helper: returns y offset
+const bob = (t, walking) => walking ? (Math.floor(t / 9) % 2) : 0;
+</script>
+<script>
+"use strict";
+// ================= GAME STATE =================
+const G = {
+  mode: "title", t: 0,
+  roomId: "", cam: { x: 0, y: 0 },
+  fade: { a: 1, dir: 0, cb: null },
+  dialog: null, menu: null,
+  shake: 0, shakeMag: 0, flash: null,
+  flags: {}, invuln: 0,
+  tp: 0, crumbs: 30, inv: ["crust", "crust", "juice"],
+  lv: 1, exp: 0, kills: 0, spares: 0,
+  party: [], titleSel: 0, endTimer: 0
+};
+function newParty(){
+  return [
+    { id:"dorko", name:"DORKO",    hp:90, maxhp:90, atk:13, sprF:dorkoFront, sprB:dorkoBack, col:"#35b04a" },
+    { id:"mega",  name:"MEGAFIRE", hp:80, maxhp:80, atk:11, sprF:megaFront,  sprB:megaBack,  col:"#5ea8e8" },
+    { id:"bmo",   name:"BMO",      hp:70, maxhp:70, atk:9,  sprF:bmoFront,   sprB:bmoBack,   col:"#6fd8c0" }
+  ];
+}
+const player = { x: 60, y: 150, dir: "down", moving: false, trail: [] };
+
+const ITEMS = {
+  crust:    { name:"PIZZA CRUST",   heal:45, desc:"A CORNER OF HOPE. 45 HP." },
+  juice:    { name:"JUICE BOX",     heal:30, tp:20, desc:"30 HP AND 20% TP." },
+  bread:    { name:"WARM BREAD",    healAll:35, desc:"WHOLE PARTY +35 HP." },
+  cheese:   { name:"CHEESE WHEEL",  heal:60, desc:"SMELLS LIKE VICTORY. 60 HP." },
+  marinara: { name:"TINY MARINARA", heal:80, desc:"RICH. RED. RESTORES 80 HP." }
+};
+
+// ---------------- save / load ----------------
+function saveGame(){
+  try {
+    localStorage.setItem("fridgequest", JSON.stringify({
+      roomId: G.roomId, x: player.x, y: player.y,
+      party: G.party.map(p => ({ id: p.id, hp: p.hp, maxhp: p.maxhp, atk: p.atk })),
+      tp: G.tp, crumbs: G.crumbs, inv: G.inv, lv: G.lv, exp: G.exp,
+      kills: G.kills, spares: G.spares, flags: G.flags
+    }));
+  } catch (e) {}
+}
+function hasSave(){ try { return !!localStorage.getItem("fridgequest"); } catch (e) { return false; } }
+function loadGame(){
+  let d = null;
+  try { d = JSON.parse(localStorage.getItem("fridgequest")); } catch (e) {}
+  if (!d) return false;
+  G.party = newParty();
+  d.party.forEach((s, i) => { if (G.party[i]){ G.party[i].hp = s.hp; G.party[i].maxhp = s.maxhp; G.party[i].atk = s.atk; } });
+  G.tp = d.tp || 0; G.crumbs = d.crumbs || 0; G.inv = d.inv || [];
+  G.lv = d.lv || 1; G.exp = d.exp || 0; G.kills = d.kills || 0; G.spares = d.spares || 0;
+  G.flags = d.flags || {};
+  enterRoom(d.roomId || "landing", d.x, d.y, true);
+  return true;
+}
+
+// ---------------- dialogue system ----------------
+const VOICES = { dorko: 320, mega: 470, bmo: 760, kongy: 170, glacion: 220, default: 540 };
+function say(script, onEnd){
+  G.dialog = { script, i: 0, chars: 0, choiceIdx: 0, onEnd, lines: null };
+  prepNode();
+}
+function prepNode(){
+  const d = G.dialog, n = d.script[d.i];
+  const maxChars = n.p ? 42 : 48;
+  d.lines = wrapText(n.t, maxChars);
+  d.total = d.lines.join(" ").length;
+  d.chars = 0; d.choiceIdx = 0;
+}
+function updateDialog(){
+  const d = G.dialog, n = d.script[d.i];
+  if (d.chars < d.total){
+    d.chars += held.x ? 3 : 1;
+    if (d.chars >= d.total) d.chars = d.total;
+    else if (G.t % 3 === 0){
+      const f = VOICES[n.p] || VOICES.default;
+      tone(f * rnd(0.95, 1.08), 0.04, n.p === "bmo" ? "triangle" : "square", 0.1);
+    }
+    if (pressed.z){ eat("z"); d.chars = d.total; }
+    return;
+  }
+  if (n.choices){
+    if (pressed.left || pressed.up){ eat("left"); eat("up"); d.choiceIdx = (d.choiceIdx + n.choices.length - 1) % n.choices.length; SFX.move(); }
+    if (pressed.right || pressed.down){ eat("right"); eat("down"); d.choiceIdx = (d.choiceIdx + 1) % n.choices.length; SFX.move(); }
+    if (pressed.z){
+      eat("z"); SFX.confirm();
+      const ch = n.choices[d.choiceIdx];
+      if (ch.fn){ closeDialog(); ch.fn(); return; }
+      if (ch.j !== undefined){ d.i = ch.j; prepNode(); return; }
+      advanceDialog();
+    }
+    return;
+  }
+  if (pressed.z){
+    eat("z");
+    if (n.fn){ closeDialog(); n.fn(); return; }
+    if (n.j !== undefined){ G.dialog.i = n.j; prepNode(); return; }
+    advanceDialog();
+  }
+}
+function advanceDialog(){
+  const d = G.dialog;
+  d.i++;
+  if (d.i >= d.script.length) closeDialog();
+  else prepNode();
+}
+function closeDialog(){
+  const cb = G.dialog ? G.dialog.onEnd : null;
+  G.dialog = null;
+  if (cb) cb();
+}
+function drawDialog(){
+  const d = G.dialog; if (!d) return;
+  const n = d.script[d.i];
+  drawBox(6, 170, 308, 64);
+  let tx = 16, ty = 180;
+  if (n.p && PORTRAITS[n.p]){
+    drawBox(12, 178, 32, 32, "#101018", "#8a93a8");
+    ctx.drawImage(PORTRAITS[n.p], 16, 183);
+    tx = 52;
+  }
+  if (n.name) { drawText(n.name, tx, 176, "#ffe14a"); ty = 186; }
+  let remaining = d.chars;
+  for (let li = 0; li < d.lines.length; li++){
+    if (remaining <= 0) break;
+    const line = d.lines[li];
+    drawText(line.slice(0, remaining), tx, ty + li * 10);
+    remaining -= line.length + 1;
+  }
+  if (d.chars >= d.total && n.choices){
+    const cw = Math.floor(296 / n.choices.length);
+    n.choices.forEach((c, i) => {
+      const cx = 12 + i * cw + cw / 2;
+      drawTextC(c.t, cx + 4, 222, i === d.choiceIdx ? "#ffe14a" : "#9aa2b8");
+      if (i === d.choiceIdx) ctx.drawImage(soulSpr, cx - textW(c.t) / 2 - 6, 222);
+    });
+  } else if (d.chars >= d.total && (G.t >> 4) % 2 === 0){
+    drawText("@", 300, 224, "#e03050");
+  }
+}
+
+// ---------------- rooms ----------------
+function wallRects(w, h, gaps){
+  // border walls with optional gap rects removed is complex; rooms list walls explicitly
+  return [];
+}
+const ROOMS = {
+  landing: {
+    w: 320, h: 240, music: "freezer", dark: true,
+    floor: "#1c2030",
+    walls: [
+      { x:0, y:0, w:320, h:56 }, { x:0, y:0, w:14, h:240 },
+      { x:0, y:226, w:320, h:14 },
+      { x:306, y:0, w:14, h:96 }, { x:306, y:152, w:14, h:88 }
+    ],
+    deco(){
+      ctx.fillStyle = "#12141f"; ctx.fillRect(0, 0, 320, 56);
+      ctx.fillStyle = "#262b42";
+      for (let x = 0; x < 320; x += 32) ctx.fillRect(x, 48, 16, 8);
+      // giant jars in the gloom
+      jar(30, 8, "#3a4260"); jar(90, 4, "#333a55"); jar(210, 6, "#3a4260"); jar(268, 10, "#333a55");
+      ctx.fillStyle = "#232841";
+      for (let x = 16; x < 306; x += 24) for (let y = 64; y < 224; y += 24)
+        if ((x + y) % 48 === 16) ctx.fillRect(x, y, 12, 12);
+      // hole in ceiling they fell through
+      ctx.fillStyle = "#05060a"; ctx.fillRect(52, 12, 40, 26);
+      ctx.fillStyle = "#0b0d16"; ctx.fillRect(56, 30, 32, 8);
+    },
+    npcs: [
+      { id:"sign1", x:120, y:100, spr:null, w:16, h:12, sign:true, name:"",
+        dlg(){ return [{ t:"WELCOME TO THE COLD WORLD. MIND THE GAP. MIND THE MOLD. MIND YOUR MANNERS." }]; } }
+    ],
+    saves: [], exits: [ { x:312, y:96, w:8, h:56, to:"village", tx:24, ty:150 } ],
+    spawns: [
+      { id:"tut_gherkin", x:262, y:120, spr:gherkinSpr, group:"tut",
+        patrol:{ axis:"y", range:24, spd:0.025 }, flag:"tutorialDone" }
+    ]
+  },
+  village: {
+    w: 560, h: 300, music: "town", dark: false,
+    floor: "#3f5a35",
+    walls: [
+      { x:0, y:0, w:560, h:70 }, { x:0, y:286, w:560, h:14 },
+      { x:0, y:0, w:10, h:120 }, { x:0, y:176, w:10, h:124 },
+      { x:550, y:0, w:10, h:120 }, { x:550, y:176, w:10, h:124 },
+      { x:70, y:70, w:70, h:46 },   // jar house 1
+      { x:230, y:70, w:70, h:46 },  // jar house 2
+      { x:400, y:70, w:70, h:46 },  // bakery
+      { x:150, y:210, w:44, h:26 }, // crate
+      { x:370, y:216, w:44, h:26 }  // crate
+    ],
+    deco(){
+      ctx.fillStyle = "#2c4226"; ctx.fillRect(0, 0, 560, 70);
+      ctx.fillStyle = "#54754a";
+      for (let x = 0; x < 560; x += 20) for (let y = 76; y < 286; y += 20)
+        if ((x + y) % 40 === 16) ctx.fillRect(x + 4, y + 4, 10, 10);
+      // path
+      ctx.fillStyle = "#8a7a54"; ctx.fillRect(0, 132, 560, 40);
+      ctx.fillStyle = "#9c8c64";
+      for (let x = 0; x < 560; x += 26) ctx.fillRect(x + 6, 140, 14, 24);
+      // houses = giant jars
+      house(70, 30, "#6a8f5e", "JAR HOME");
+      house(230, 30, "#8f6a5e", "JAR HOME");
+      house(400, 30, "#b09050", "BAKERY");
+      crate(150, 210); crate(370, 216);
+      // lamp pickles on posts
+      lamp(120, 190); lamp(330, 190); lamp(480, 190);
+    },
+    npcs: [
+      { id:"mayor", x:200, y:150, spr:cabbageSpr, w:14, h:12, solid:true, name:"MAYOR CABBAGIO",
+        dlg(n){
+          if (!G.flags.metMayor){ G.flags.metMayor = 1;
+            return [
+              { t:"MAYOR CABBAGIO: WELCOME TO CRISPER VILLAGE! CRUNCHIEST CORNER OF THE COLD WORLD." },
+              { t:"MAYOR CABBAGIO: TRAVELERS, EH? SEEKING THE MYTHICAL PIZZA ROLLS, NO DOUBT." },
+              { p:"dorko", name:"DORKO", t:"HOW'D YOU KNOW?" },
+              { t:"MAYOR CABBAGIO: EVERYONE WHO FALLS IN HERE IS. THE ROLLS LIE PAST SHELF PASS, DEEP IN THE FREEZER... GUARDED BY KING GLACION." },
+              { t:"MAYOR CABBAGIO: HE HOARDS EVERYTHING WARM. IT'S A WHOLE THING. GOOD LUCK!" }
+            ];
+          }
+          return n % 2 ? [{ t:"MAYOR CABBAGIO: I HAVE 47 LAYERS. ALL OF THEM ARE POLICY." }]
+                       : [{ t:"MAYOR CABBAGIO: THE FREEZER IS EAST, PAST SHELF PASS. DRESS CRUNCHY." }];
+        } },
+      { id:"milk", x:100, y:200, spr:milkSpr, w:12, h:12, solid:true, name:"2%",
+        dlg(n){
+          return n % 3 === 0 ? [{ t:"2%: I'M 2% MILK. THE OTHER 98% IS ANXIETY." }]
+               : n % 3 === 1 ? [{ t:"2%: MY EXPIRY DATE? WE... WE DON'T TALK ABOUT THAT." }]
+               : [{ t:"2%: STAY COOL. LITERALLY. IT'S HOW WE ALL SURVIVE." }];
+        } },
+      { id:"baker", x:430, y:130, spr:baguetteSpr, w:12, h:12, solid:true, name:"BAGUETTE BANDIT",
+        dlg(){ return shopScript(); } },
+      { id:"yogurt", x:300, y:220, spr:yogurtSpr, w:10, h:10, solid:true, name:"LIL YOGURT",
+        dlg(n){
+          return n % 2 ? [{ t:"LIL YOGURT: MOM SAYS I'M FULL OF ACTIVE CULTURES. I JUST WANNA BE ACTIVE." }]
+                       : [{ t:"LIL YOGURT: ONE DAY I'LL BE A PARFAIT. DREAM BIG, THAT'S WHAT I ALWAYS SAY." }];
+        } },
+      { id:"tom1", x:480, y:160, spr:tomatoSpr, w:10, h:10, solid:true, name:"TERRY",
+        dlg(){ return [{ t:"TERRY: I'M A VEGETABLE. IT'S MY WHOLE IDENTITY." }]; } },
+      { id:"tom2", x:498, y:168, spr:tomatoSpr, w:10, h:10, solid:true, name:"JERRY",
+        dlg(){ return [{ t:"JERRY: WE'RE FRUIT, TERRY. BOTANICALLY WE ARE FRUIT." }, { t:"TERRY: NOT IN MY HEART, JERRY." }]; } },
+      { id:"butter", x:70, y:250, spr:butterSpr, w:14, h:10, solid:true, name:"BUTTER GOLEM",
+        dlg(n){
+          return n % 2 ? [{ t:"BUTTER GOLEM: SOFT......... SPREADABLE........." }]
+                       : [{ t:"(THE GOLEM DREAMS OF TOAST. YOU CAN TELL.)" }];
+        } }
+    ],
+    saves: [ { x:280, y:190 } ],
+    exits: [
+      { x:0, y:120, w:8, h:56, to:"landing", tx:290, ty:124 },
+      { x:552, y:120, w:8, h:56, to:"shelf", tx:26, ty:110 }
+    ],
+    spawns: []
+  },
+  shelf: {
+    w: 640, h: 200, music: "town", dark: false,
+    floor: "#4a4436",
+    walls: [
+      { x:0, y:0, w:640, h:52 }, { x:0, y:186, w:640, h:14 },
+      { x:0, y:0, w:10, h:82 }, { x:0, y:138, w:10, h:62 },
+      { x:630, y:0, w:10, h:82 }, { x:630, y:138, w:10, h:62 },
+      { x:200, y:52, w:26, h:60 }, { x:420, y:110, w:26, h:76 }
+    ],
+    deco(){
+      ctx.fillStyle = "#332f26"; ctx.fillRect(0, 0, 640, 52);
+      ctx.fillStyle = "#5c5443";
+      for (let x = 0; x < 640; x += 24) ctx.fillRect(x, 44, 12, 8);
+      ctx.fillStyle = "#403a2e";
+      for (let x = 0; x < 640; x += 28) for (let y = 60; y < 186; y += 28)
+        if ((x + y) % 56 === 32) ctx.fillRect(x, y, 14, 14);
+      jar(60, 6, "#5f5a8c"); jar(300, 2, "#8c5a5a"); jar(540, 6, "#5a8c6a");
+      // fallen jars as obstacles
+      ctx.fillStyle = "#6a628c"; ctx.fillRect(200, 60, 26, 52);
+      ctx.fillStyle = "#8a82ac"; ctx.fillRect(204, 64, 8, 44);
+      ctx.fillStyle = "#8c6262"; ctx.fillRect(420, 118, 26, 68);
+      ctx.fillStyle = "#ac8282"; ctx.fillRect(424, 122, 8, 60);
+      drawText("SHELF PASS", 270, 20, "#8a8264");
+    },
+    npcs: [
+      { id:"sign2", x:80, y:100, spr:null, w:16, h:12, sign:true,
+        dlg(){ return [{ t:"SHELF PASS. BEWARE OF SENTIENT SNACKS. NO REFUNDS." }]; } }
+    ],
+    saves: [],
+    exits: [
+      { x:0, y:82, w:8, h:56, to:"village", tx:526, ty:148 },
+      { x:632, y:82, w:8, h:56, to:"freezer", tx:26, ty:150 }
+    ],
+    spawns: [
+      { id:"shelf_egg", x:300, y:130, spr:eggbertSpr, group:"shelf1",
+        patrol:{ axis:"x", range:40, spd:0.02 }, flag:"e_shelf1" },
+      { id:"shelf_duo", x:500, y:100, spr:gherkinSpr, group:"shelf2",
+        patrol:{ axis:"y", range:26, spd:0.03 }, flag:"e_shelf2" }
+    ]
+  },
+  freezer: {
+    w: 560, h: 300, music: "freezer", dark: true,
+    floor: "#1e2745",
+    walls: [
+      { x:0, y:0, w:560, h:64 }, { x:0, y:286, w:560, h:14 },
+      { x:0, y:0, w:10, h:120 }, { x:0, y:176, w:10, h:124 },
+      { x:550, y:0, w:10, h:120 }, { x:550, y:176, w:10, h:124 },
+      { x:250, y:64, w:30, h:90 },    // ice pillar
+      { x:392, y:64, w:26, h:80 },    // gate top
+      { x:392, y:188, w:26, h:98 }    // gate bottom (kongy stands in gap)
+    ],
+    deco(){
+      ctx.fillStyle = "#141a30"; ctx.fillRect(0, 0, 560, 64);
+      ctx.fillStyle = "#2c3a63";
+      for (let x = 0; x < 560; x += 26) ctx.fillRect(x, 56, 13, 8);
+      ctx.fillStyle = "#26335a";
+      for (let x = 0; x < 560; x += 30) for (let y = 70; y < 286; y += 30)
+        if ((x + y) % 60 === 10) ctx.fillRect(x, y, 15, 15);
+      // frost piles
+      ctx.fillStyle = "#7f9fd0";
+      [[40,90],[120,250],[330,240],[480,90],[200,200]].forEach(([x,y]) => {
+        ctx.fillRect(x, y + 6, 22, 6); ctx.fillRect(x + 4, y, 14, 8);
+      });
+      // ice pillar
+      icePillar(250, 34, 30, 120); icePillar(392, 34, 26, 110); icePillar(392, 188, 26, 98);
+      drawText("FREEZER DEPTHS", 230, 26, "#5f7fb0");
+    },
+    npcs: [
+      { id:"sign3", x:60, y:110, spr:null, w:16, h:12, sign:true,
+        dlg(){ return [{ t:"THE FREEZER KING SEES ALL. HE ALSO CRIES A LOT. THE TEARS BECOME ICICLES. IT'S A PROBLEM." }]; } },
+      { id:"kongy", x:404, y:164, spr:kongySpr, w:22, h:48, solid:true, name:"KONGY",
+        hideFlag:"kongyDone", dlg(){ return kongyScript(); } },
+      { id:"kongy2", x:350, y:248, spr:kongySpr, w:18, h:14, solid:true, name:"KONGY",
+        needFlag:"kongySpared",
+        dlg(n){
+          return n % 2 ? [{ p:"kongy", name:"KONGY", t:"KONGY RESPECTS YOU FOREVER. TAKE A WHIFF ANYTIME. IT IS FREE." }]
+                       : [{ p:"kongy", name:"KONGY", t:"KONGY'S COUSIN RUNS THE PRODUCE DRAWER. TELL HIM KONGY SAYS 'OOK'." }];
+        } }
+    ],
+    saves: [ { x:70, y:170 } ],
+    exits: [
+      { x:0, y:120, w:8, h:56, to:"shelf", tx:606, ty:110 },
+      { x:552, y:120, w:8, h:56, to:"throne", tx:30, ty:150 }
+    ],
+    spawns: [
+      { id:"fz_onion", x:180, y:120, spr:onionSpr, group:"freezer1",
+        patrol:{ axis:"x", range:36, spd:0.025 }, flag:"e_fz1" },
+      { id:"fz_duo", x:300, y:230, spr:onionSpr, group:"freezer2",
+        patrol:{ axis:"y", range:24, spd:0.03 }, flag:"e_fz2" }
+    ]
+  },
+  throne: {
+    w: 320, h: 240, music: "freezer", dark: true,
+    floor: "#1a2140",
+    walls: [
+      { x:0, y:0, w:320, h:70 }, { x:0, y:226, w:320, h:14 },
+      { x:0, y:0, w:10, h:100 }, { x:0, y:156, w:10, h:84 },
+      { x:310, y:0, w:10, h:240 }
+    ],
+    deco(){
+      ctx.fillStyle = "#10152b"; ctx.fillRect(0, 0, 320, 70);
+      ctx.fillStyle = "#232d52";
+      for (let x = 0; x < 320; x += 22) ctx.fillRect(x, 62, 11, 8);
+      ctx.fillStyle = "#202a4e";
+      for (let x = 0; x < 320; x += 26) for (let y = 76; y < 226; y += 26)
+        if ((x + y) % 52 === 24) ctx.fillRect(x, y, 13, 13);
+      // throne dais
+      ctx.fillStyle = "#2e3c6e"; ctx.fillRect(120, 70, 80, 30);
+      ctx.fillStyle = "#3c4f8e"; ctx.fillRect(130, 74, 60, 22);
+      icePillar(30, 40, 20, 80); icePillar(270, 40, 20, 80);
+      if (G.flags.bossDone){
+        ctx.drawImage(shrineSpr, 152, 78);
+        const gl = (Math.sin(G.t / 12) + 1) / 2;
+        ctx.globalAlpha = 0.5 + gl * 0.5;
+        ctx.drawImage(rollSpr, 155, 66);
+        ctx.globalAlpha = 1;
+      }
+    },
+    npcs: [
+      { id:"glacion", x:160, y:118, spr:glacionSpr, w:22, h:16, solid:true, name:"KING GLACION",
+        hideFlag:"bossDone", dlg(){ return bossIntroScript(); } },
+      { id:"shrine", x:160, y:96, spr:null, w:20, h:12, sign:true, noDraw:true, needFlag:"bossDone",
+        dlg(){ return endingScript(); } }
+    ],
+    saves: [ { x:60, y:190 } ],
+    exits: [ { x:0, y:100, w:8, h:56, to:"freezer", tx:526, ty:148 } ],
+    spawns: []
+  }
+};
+// deco helpers
+function jar(x, y, col){
+  ctx.fillStyle = col; ctx.fillRect(x, y + 10, 36, 34);
+  ctx.fillRect(x + 4, y + 4, 28, 8);
+  ctx.fillStyle = "#c9c9d8"; ctx.fillRect(x + 6, y, 24, 6);
+  ctx.fillStyle = "rgba(255,255,255,0.12)"; ctx.fillRect(x + 5, y + 12, 6, 28);
+}
+function house(x, y, col, label){
+  ctx.fillStyle = col; ctx.fillRect(x, y + 14, 70, 72);
+  ctx.fillStyle = "#c9c9d8"; ctx.fillRect(x + 8, y, 54, 16);
+  ctx.fillStyle = "rgba(0,0,0,0.25)"; ctx.fillRect(x + 26, y + 52, 20, 34);
+  ctx.fillStyle = "rgba(255,255,255,0.15)"; ctx.fillRect(x + 8, y + 20, 10, 56);
+  ctx.fillStyle = "#f5e8c0"; ctx.fillRect(x + 12, y + 30, 14, 12); ctx.fillRect(x + 44, y + 30, 14, 12);
+  drawTextC(label, x + 35, y + 20, "#14141c");
+}
+function crate(x, y){
+  ctx.fillStyle = "#8a6a3c"; ctx.fillRect(x, y, 44, 26);
+  ctx.fillStyle = "#a8854c"; ctx.fillRect(x + 3, y + 3, 38, 20);
+  ctx.fillStyle = "#8a6a3c"; ctx.fillRect(x + 3, y + 11, 38, 3);
+}
+function lamp(x, y){
+  ctx.fillStyle = "#4a4436"; ctx.fillRect(x, y - 26, 4, 30);
+  ctx.fillStyle = "#5da33c"; ctx.fillRect(x - 3, y - 34, 10, 10);
+  ctx.fillStyle = "#c9f07a"; ctx.fillRect(x - 1, y - 32, 6, 6);
+}
+function icePillar(x, y, w, h){
+  ctx.fillStyle = "#4a6aa8"; ctx.fillRect(x, y, w, h);
+  ctx.fillStyle = "#7f9fd0"; ctx.fillRect(x + 3, y + 4, 6, h - 8);
+  ctx.fillStyle = "#3a5488"; ctx.fillRect(x + w - 6, y + 4, 4, h - 8);
+}
+
+// npc talk counters
+const talkCounts = {};
+
+// ---------------- room transitions ----------------
+function enterRoom(id, x, y, instant){
+  G.roomId = id; player.x = x; player.y = y; player.trail = [];
+  G.invuln = 60;
+  for (const k in spawnState) delete spawnState[k];
+  const r = ROOMS[id];
+  playMusic(r.music);
+  if (instant){ G.fade.a = 1; G.fade.dir = -1; G.fade.cb = null; }
+}
+function transitionTo(id, x, y){
+  G.fade.dir = 1;
+  G.fade.cb = () => { enterRoom(id, x, y); G.fade.dir = -1; G.fade.cb = null; };
+}
+function updateFade(){
+  if (G.fade.dir !== 0){
+    G.fade.a = clamp(G.fade.a + G.fade.dir * 0.06, 0, 1);
+    if (G.fade.dir > 0 && G.fade.a >= 1){ const cb = G.fade.cb; G.fade.dir = 0; if (cb) cb(); }
+    if (G.fade.dir < 0 && G.fade.a <= 0){ G.fade.dir = 0; }
+  }
+}
+function drawFade(){
+  if (G.fade.a > 0){ ctx.fillStyle = `rgba(4,5,10,${G.fade.a})`; ctx.fillRect(0, 0, W, H); }
+}
+
+// ---------------- overworld update ----------------
+function feetBox(x, y){ return { x: x - 5, y: y - 5, w: 10, h: 8 }; }
+function collides(box, room){
+  for (const wl of room.walls) if (overlaps(box, wl)) return true;
+  for (const n of room.npcs){
+    if (n.needFlag && !G.flags[n.needFlag]) continue;
+    if (n.hideFlag && G.flags[n.hideFlag]) continue;
+    if (!n.solid) continue;
+    if (overlaps(box, { x: n.x - n.w / 2, y: n.y - n.h / 2, w: n.w, h: n.h })) return true;
+  }
+  return false;
+}
+const spawnState = {};
+function spawnPos(sp){
+  let s = spawnState[sp.id];
+  if (!s) s = spawnState[sp.id] = { x: sp.x, y: sp.y };
+  return s;
+}
+function updateSpawn(sp){
+  const s = spawnPos(sp);
+  const d = dist(player.x, player.y, s.x, s.y);
+  if (d < 80 && d > 2 && G.invuln <= 0){
+    s.x += (player.x - s.x) / d * 0.75;
+    s.y += (player.y - s.y) / d * 0.75;
+  } else {
+    const off = Math.sin(G.t * sp.patrol.spd) * sp.patrol.range;
+    const tx = sp.x + (sp.patrol.axis === "x" ? off : 0);
+    const ty = sp.y + (sp.patrol.axis === "y" ? off : 0);
+    s.x += (tx - s.x) * 0.05; s.y += (ty - s.y) * 0.05;
+  }
+}
+function updateWorld(){
+  const room = ROOMS[G.roomId];
+  updateFade();
+  if (G.fade.dir !== 0 && G.fade.cb) return;
+  if (G.invuln > 0) G.invuln--;
+
+  if (G.menu){ updateWorldMenu(); return; }
+  if (G.dialog){ updateDialog(); return; }
+
+  if (pressed.c){ eat("c"); SFX.confirm(); G.menu = { view: "main", sel: 0, itemSel: 0, target: 0 }; return; }
+
+  // movement
+  const spd = held.x ? 2.3 : 1.4;
+  let dx = 0, dy = 0;
+  if (held.left) dx -= 1; if (held.right) dx += 1;
+  if (held.up) dy -= 1; if (held.down) dy += 1;
+  player.moving = !!(dx || dy);
+  if (player.moving){
+    if (dx && dy){ dx *= 0.707; dy *= 0.707; }
+    if (dy < 0) player.dir = "up"; else if (dy > 0) player.dir = "down";
+    if (dx < 0) player.dir = "left"; else if (dx > 0) player.dir = "right";
+    let nb = feetBox(player.x + dx * spd, player.y);
+    if (!collides(nb, room)) player.x += dx * spd;
+    nb = feetBox(player.x, player.y + dy * spd);
+    if (!collides(nb, room)) player.y += dy * spd;
+    player.x = clamp(player.x, 8, room.w - 8);
+    player.y = clamp(player.y, 8, room.h - 8);
+    player.trail.push({ x: player.x, y: player.y, dir: player.dir });
+    if (player.trail.length > 80) player.trail.shift();
+  }
+
+  // camera
+  G.cam.x = clamp(player.x - W / 2, 0, Math.max(0, room.w - W));
+  G.cam.y = clamp(player.y - H / 2, 0, Math.max(0, room.h - H));
+
+  // exits
+  const fb = feetBox(player.x, player.y);
+  for (const ex of room.exits){
+    if (overlaps(fb, ex)){ transitionTo(ex.to, ex.tx, ex.ty); return; }
+  }
+
+  // enemy contact
+  for (const sp of room.spawns){
+    if (G.flags[sp.flag]) continue;
+    updateSpawn(sp);
+    const p = spawnPos(sp);
+    if (G.invuln <= 0 && overlaps(fb, { x: p.x - 9, y: p.y - 8, w: 18, h: 16 })){
+      startBattle(sp.group, sp.flag);
+      return;
+    }
+  }
+
+  // interact
+  if (pressed.z){
+    eat("z");
+    const px = player.x + (player.dir === "left" ? -16 : player.dir === "right" ? 16 : 0);
+    const py = player.y + (player.dir === "up" ? -16 : player.dir === "down" ? 16 : 0);
+    // save points
+    for (const sv of room.saves){
+      if (dist(px, py, sv.x, sv.y) < 20 || dist(player.x, player.y, sv.x, sv.y) < 24){
+        SFX.save();
+        G.party.forEach(p => p.hp = p.maxhp);
+        saveGame();
+        say([{ t: pick([
+          "THE QUIET HUM OF THE FRIDGE FILLS YOU WITH CHILL DETERMINATION.",
+          "SOMEWHERE, AN ICE CUBE CRACKS. YOU FEEL VALIDATED. HP RESTORED.",
+          "THE LITTLE LIGHT TURNS ON JUST FOR YOU. HP RESTORED. GAME SAVED."
+        ]) + " (GAME SAVED)" }]);
+        return;
+      }
+    }
+    for (const n of room.npcs){
+      if (n.needFlag && !G.flags[n.needFlag]) continue;
+      if (n.hideFlag && G.flags[n.hideFlag]) continue;
+      if (dist(px, py, n.x, n.y) < 24 || dist(player.x, player.y, n.x, n.y) < 28){
+        SFX.interact();
+        talkCounts[n.id] = (talkCounts[n.id] || 0) + 1;
+        const script = n.dlg(talkCounts[n.id] - 1);
+        if (script) say(script);
+        return;
+      }
+    }
+  }
+}
+
+// ---------------- overworld render ----------------
+function partyMember(i){
+  // i=0 leader, 1,2 followers; returns {x,y,dir,walking}
+  if (i === 0) return { x: player.x, y: player.y, dir: player.dir, walking: player.moving };
+  const back = i * 14;
+  const t = player.trail;
+  if (t.length > back){
+    const p = t[t.length - 1 - back];
+    return { x: p.x, y: p.y, dir: p.dir, walking: player.moving };
+  }
+  return { x: player.x, y: player.y, dir: player.dir, walking: false };
+}
+function drawCharSprite(mem, pos){
+  const spr = pos.dir === "up" ? mem.sprB : mem.sprF;
+  const flip = pos.dir === "left";
+  const yo = bob(G.t, pos.walking);
+  if (mem.hp <= 0) ctx.globalAlpha = 0.5;
+  drawSpr(spr, pos.x - 8, pos.y - 17 + yo, { flip });
+  ctx.globalAlpha = 1;
+}
+const darkOverlay = document.createElement("canvas");
+darkOverlay.width = W; darkOverlay.height = H;
+function drawWorld(){
+  const room = ROOMS[G.roomId];
+  ctx.save();
+  if (G.shake > 0){ ctx.translate(irnd(-G.shakeMag, G.shakeMag), irnd(-G.shakeMag, G.shakeMag)); }
+  ctx.translate(-Math.round(G.cam.x), -Math.round(G.cam.y));
+  ctx.fillStyle = room.floor; ctx.fillRect(0, 0, room.w, room.h);
+  room.deco();
+
+  // collect drawables, sort by y
+  const items = [];
+  for (const n of room.npcs){
+    if (n.needFlag && !G.flags[n.needFlag]) continue;
+    if (n.hideFlag && G.flags[n.hideFlag]) continue;
+    if (n.sign && !n.spr){
+      if (!n.noDraw) items.push({ y: n.y, draw(){ signPost(n.x, n.y); } });
+    } else if (n.spr){
+      items.push({ y: n.y, draw(){
+        const yo = n.id === "kongy" ? Math.floor(Math.sin(G.t / 20) * 1.5) : 0;
+        drawSpr(n.spr, n.x - n.spr.width / 2, n.y - n.spr.height + 5 + yo, {});
+      } });
+    }
+  }
+  for (const sv of room.saves){
+    items.push({ y: sv.y, draw(){
+      const f = (G.t >> 4) % 2 === 0 ? saveSpr1 : saveSpr2;
+      drawSpr(f, sv.x - 4, sv.y - 8, {});
+    } });
+  }
+  for (const sp of room.spawns){
+    if (G.flags[sp.flag]) continue;
+    const p = spawnPos(sp);
+    items.push({ y: p.y, draw(){
+      drawSpr(sp.spr, p.x - sp.spr.width / 2, p.y - sp.spr.height + 5, {});
+      if ((G.t >> 3) % 4 === 0){ drawText("!", p.x - 2, p.y - sp.spr.height - 6, "#ff5858"); }
+    } });
+  }
+  for (let i = 2; i >= 0; i--){
+    const pos = partyMember(i), mem = G.party[i];
+    items.push({ y: pos.y + (2 - i) * 0.01, draw(){ drawCharSprite(mem, pos); } });
+  }
+  items.sort((a, b) => a.y - b.y).forEach(it => it.draw());
+  ctx.restore();
+
+  if (room.dark){
+    const g = darkOverlay.getContext("2d");
+    g.clearRect(0, 0, W, H);
+    g.fillStyle = "rgba(8,12,42,0.55)"; g.fillRect(0, 0, W, H);
+    g.globalCompositeOperation = "destination-out";
+    const lx = player.x - G.cam.x, ly = player.y - G.cam.y - 8;
+    const grad = g.createRadialGradient(lx, ly, 12, lx, ly, 85);
+    grad.addColorStop(0, "rgba(0,0,0,0.9)"); grad.addColorStop(1, "rgba(0,0,0,0)");
+    g.fillStyle = grad; g.beginPath(); g.arc(lx, ly, 85, 0, 7); g.fill();
+    g.globalCompositeOperation = "source-over";
+    ctx.drawImage(darkOverlay, 0, 0);
+  }
+  if (G.flash){
+    ctx.fillStyle = G.flash.color.replace("A)", G.flash.a + ")");
+    ctx.globalAlpha = G.flash.a; ctx.fillStyle = G.flash.color; ctx.fillRect(0, 0, W, H);
+    ctx.globalAlpha = 1;
+    G.flash.a -= 0.08; if (G.flash.a <= 0) G.flash = null;
+  }
+  drawFade();
+  if (G.menu) drawWorldMenu();
+  drawDialog();
+}
+function signPost(x, y){
+  ctx.fillStyle = "#6a5432"; ctx.fillRect(x - 2, y - 8, 4, 10);
+  ctx.fillStyle = "#8a7148"; ctx.fillRect(x - 8, y - 16, 16, 10);
+  ctx.fillStyle = "#5c4a2e"; ctx.fillRect(x - 6, y - 14, 12, 2); ctx.fillRect(x - 6, y - 11, 12, 2);
+}
+
+// ---------------- overworld menu (C) ----------------
+function updateWorldMenu(){
+  const m = G.menu;
+  if (m.view === "main"){
+    if (pressed.x || pressed.c){ eat("x"); eat("c"); SFX.cancel(); G.menu = null; return; }
+    if (pressed.up){ eat("up"); m.sel = (m.sel + 1) % 2; SFX.move(); }
+    if (pressed.down){ eat("down"); m.sel = (m.sel + 1) % 2; SFX.move(); }
+    if (pressed.z){
+      eat("z");
+      if (m.sel === 0){
+        if (G.inv.length === 0){ SFX.cancel(); return; }
+        SFX.confirm(); m.view = "items"; m.itemSel = 0;
+      } else { SFX.cancel(); G.menu = null; }
+    }
+  } else if (m.view === "items"){
+    if (pressed.x){ eat("x"); SFX.cancel(); m.view = "main"; return; }
+    if (pressed.up){ eat("up"); m.itemSel = (m.itemSel + G.inv.length - 1) % G.inv.length; SFX.move(); }
+    if (pressed.down){ eat("down"); m.itemSel = (m.itemSel + 1) % G.inv.length; SFX.move(); }
+    if (pressed.z){ eat("z"); SFX.confirm(); m.view = "target"; m.target = 0; }
+  } else if (m.view === "target"){
+    if (pressed.x){ eat("x"); SFX.cancel(); m.view = "items"; return; }
+    if (pressed.up){ eat("up"); m.target = (m.target + 2) % 3; SFX.move(); }
+    if (pressed.down){ eat("down"); m.target = (m.target + 1) % 3; SFX.move(); }
+    if (pressed.z){
+      eat("z");
+      useItem(G.inv[m.itemSel], m.target);
+      m.view = G.inv.length ? "items" : "main";
+      m.itemSel = 0;
+    }
+  }
+}
+function useItem(itemId, targetIdx){
+  const it = ITEMS[itemId];
+  if (!it) return;
+  SFX.heal();
+  if (it.healAll){
+    G.party.forEach(p => p.hp = Math.min(p.maxhp, p.hp + it.healAll));
+  } else {
+    const t = G.party[targetIdx];
+    t.hp = Math.min(t.maxhp, t.hp + it.heal);
+  }
+  if (it.tp) G.tp = clamp(G.tp + it.tp, 0, 100);
+  G.inv.splice(G.inv.indexOf(itemId), 1);
+}
+function hpBar(x, y, w, hp, maxhp, col){
+  ctx.fillStyle = "#3a3f52"; ctx.fillRect(x, y, w, 5);
+  ctx.fillStyle = col || (hp / maxhp > 0.35 ? "#58c858" : "#e05858");
+  ctx.fillRect(x, y, Math.max(0, Math.round(w * hp / maxhp)), 5);
+}
+function drawWorldMenu(){
+  const m = G.menu;
+  drawBox(180, 8, 134, 120);
+  G.party.forEach((p, i) => {
+    const y = 16 + i * 26;
+    drawText(p.name, 188, y, p.col);
+    hpBar(188, y + 9, 80, p.hp, p.maxhp);
+    drawText(`${p.hp}/${p.maxhp}`, 272, y + 8, "#c9c9d8");
+  });
+  drawText(`TP ${Math.round(G.tp)}%`, 188, 96, "#f0a030");
+  hpBar(230, 97, 50, G.tp, 100, "#f0a030");
+  drawText(`CRUMBS ${G.crumbs}`, 188, 108, "#ffe14a");
+  drawText(`LV ${G.lv}`, 282, 108, "#c9c9d8");
+  drawBox(180, 132, 134, 34);
+  ["ITEMS", "CLOSE"].forEach((s, i) => {
+    drawText(s, 200, 140 + i * 11, m.view === "main" && m.sel === i ? "#ffe14a" : "#c9c9d8");
+    if (m.view === "main" && m.sel === i) ctx.drawImage(soulSpr, 190, 141 + i * 11);
+  });
+  if (m.view === "items" || m.view === "target"){
+    drawBox(30, 8, 144, 24 + Math.max(1, G.inv.length) * 11);
+    drawText("ITEMS", 40, 14, "#8a93a8");
+    if (G.inv.length === 0) drawText("(EMPTY)", 40, 26, "#5a5f72");
+    G.inv.forEach((id, i) => {
+      drawText(ITEMS[id].name, 48, 26 + i * 11, m.view === "items" && m.itemSel === i ? "#ffe14a" : "#c9c9d8");
+      if (m.itemSel === i) ctx.drawImage(soulSpr, 38, 27 + i * 11);
+    });
+    if (m.view === "items" && G.inv[m.itemSel])
+      drawText(ITEMS[G.inv[m.itemSel]].desc, 12, H - 10, "#8a93a8");
+  }
+  if (m.view === "target"){
+    drawBox(30, 140, 120, 46);
+    drawText("USE ON:", 38, 146, "#8a93a8");
+    G.party.forEach((p, i) => {
+      drawText(p.name, 56, 156 + i * 10, m.target === i ? "#ffe14a" : "#c9c9d8");
+      if (m.target === i) ctx.drawImage(soulSpr, 44, 157 + i * 10);
+    });
+  }
+}
+
+// ---------------- shop ----------------
+function shopScript(){
+  if (!G.flags.metBaker){
+    G.flags.metBaker = 1;
+    return [
+      { t:"BAGUETTE BANDIT: AH! CUSTOMERS! I USED TO STEAL BREAD. NOW I AM BREAD. ZE IRONY IS CRUNCHY." },
+      { t:"BAGUETTE BANDIT: BUY SOMETHING, OR SIMPLY BASK IN MY CRUST.", fn: shopMenu }
+    ];
+  }
+  return [ { t:"BAGUETTE BANDIT: WELCOME BACK TO ZE BAKERY.", fn: shopMenu } ];
+}
+const SHOP_STOCK = [ ["crust", 20], ["bread", 35], ["marinara", 50] ];
+function shopMenu(){
+  const choices = SHOP_STOCK.map(([id, price]) => ({
+    t: `${ITEMS[id].name.split(" ")[0]} ${price}`,
+    fn(){ buyItem(id, price); }
+  }));
+  choices.push({ t:"LEAVE", fn(){ say([{ t:"BAGUETTE BANDIT: AU REVOIR! STAY TOASTY!" }]); } });
+  say([{ t:`WHAT'LL IT BE? (YOU HAVE ${G.crumbs} CRUMBS)`, choices }]);
+}
+function buyItem(id, price){
+  if (G.crumbs < price){
+    say([{ t:"BAGUETTE BANDIT: NOT ENOUGH CRUMBS! ZE ECONOMY, SHE IS BRUTAL.", fn: shopMenu }]);
+  } else if (G.inv.length >= 8){
+    say([{ t:"BAGUETTE BANDIT: YOUR POCKETS! ZEY ARE FULL! COME BACK LATER.", fn: shopMenu }]);
+  } else {
+    G.crumbs -= price; G.inv.push(id); SFX.confirm();
+    say([{ t:`GOT ZE ${ITEMS[id].name}! MERCI!`, fn: shopMenu }]);
+  }
+}
+</script>
+<script>
+"use strict";
+// ================= BATTLE SYSTEM =================
+const ENEMY_DEFS = {
+  gherkin: {
+    name:"GHERKIN", spr:gherkinSpr, hp:60, atk:5, def:1, exp:15, crumbs:12, pattern:"aimed",
+    check:"GHERKIN - ATK 5 DEF 1. A PICKLE CADET. BRINED FOR BATTLE, BORN FOR SNACKING.",
+    quotes:["FEEL MY VINEGAR!","I'M KIND OF A BIG DILL.","MY SPEAR IS A TOOTHPICK. DON'T LAUGH.","BRINE TIME!"],
+    acts:[
+      { t:"COMPLIMENT", fn(e){ e.spareable = true; return "YOU TELL GHERKIN HE IS EXTREMELY CRUNCHY. HE BLUSHES PURE BRINE."; } },
+      { t:"TICKLE", fn(e){ e.atk = Math.max(2, e.atk - 2); return "YOU TICKLE GHERKIN. HE DROPS HIS TOOTHPICK. ATTACK DOWN!"; } }
+    ],
+    killText:"GHERKIN RETURNS TO THE BRINE.", spareText:"GHERKIN WIGGLES AWAY, FLATTERED."
+  },
+  eggbert: {
+    name:"EGGBERT", spr:eggbertSpr, hp:85, atk:6, def:2, exp:22, crumbs:18, pattern:"waves",
+    check:"EGGBERT - ATK 6 DEF 2. A KNIGHT WHO IS ALSO AN EGG. DEEPLY WORRIED ABOUT CRACKING.",
+    quotes:["NONE SHALL PASS! PROBABLY!","I AM VERY FRAGILE EMOTIONALLY AND PHYSICALLY.","EN GARDE! GENTLY!","MY YOLK IS UNBROKEN. SO FAR."],
+    acts:[
+      { t:"WHISK", fn(e){ e.soft = true; return "YOU MIME A VIGOROUS WHISKING. EGGBERT FEELS SCRAMBLED. HIS ATTACKS SOFTEN."; } },
+      { t:"PEP TALK", fn(e){
+          if (e.soft){ e.spareable = true; return "YOU TELL EGGBERT HE'S ALREADY A GOOD EGG. HE LOWERS HIS SPEAR, MOVED."; }
+          return "EGGBERT CAN'T HEAR YOU THROUGH THE HELMET. TRY SOFTENING HIM UP FIRST."; } }
+    ],
+    killText:"EGGBERT CRACKS. HE WAS A GOOD EGG.", spareText:"EGGBERT SALUTES AND ROLLS AWAY WITH DIGNITY."
+  },
+  onion: {
+    name:"ONION RINGO", spr:onionSpr, hp:75, atk:6, def:1, exp:20, crumbs:16, pattern:"spiral",
+    check:"ONION RINGO - ATK 6 DEF 1. A DRUMMER WITH LAYERS. CRIES CONSTANTLY. IT'S NOT YOU.",
+    quotes:["*SNIFF* IT'S NOT SADNESS, IT'S SCIENCE!","EVERY RING IS A GREATEST HIT!","I CRY AT EVERYTHING. MOSTLY MYSELF.","DRUM SOLO!!"],
+    acts:[
+      { t:"CRY WITH", fn(e){ e.mercy++;
+          if (e.mercy >= 2){ e.spareable = true; return "YOU BOTH SOB IN HARMONY. ONION RINGO FEELS TRULY HEARD."; }
+          return "YOU CRY TOGETHER. IT'S ONION THINGS. HE APPRECIATES IT."; } },
+      { t:"ROCK OUT", fn(e){ G.tp = clamp(G.tp + 12, 0, 100); return "YOU AIR-DRUM WITH ONION RINGO. THE BEAT IS UNPEELABLE. TP UP!"; } }
+    ],
+    killText:"ONION RINGO PEELS AWAY INTO NOTHING. SOMEONE IS CUTTING ONIONS IN HERE.",
+    spareText:"ONION RINGO PLAYS ONE PERFECT FILL AND BOWS OUT."
+  },
+  kongy: {
+    name:"KONGY GORGONZOLA", spr:kongySpr, hp:160, atk:8, def:2, exp:45, crumbs:50, pattern:"bounce",
+    check:"KONGY GORGONZOLA - ATK 8 DEF 2. A GORILLA MADE OF PREMIUM BLUE CHEESE. SMELLS INCREDIBLE. THIS IS A FACT.",
+    quotes:["KONGY SMELLS INCREDIBLE. THIS IS A FACT.","BARREL! IT IS CHEESE! CHEESE BARREL!","KONGY GUARDS FREEZER. KONGY IS FREEZER'S BEST FRIEND.","KONGY ONCE ATE A WHOLE SHELF. NO REGRET."],
+    acts:[
+      { t:"SNIFF", fn(e){ e.sniffed = true; return "YOU INHALE DEEPLY. IT'S... POWERFUL. KONGY NODS, FLATTERED TO TEARS."; } },
+      { t:"FLEX", fn(e){
+          if (e.sniffed){ e.spareable = true; return "YOU FLEX. KONGY FLEXES BACK. KONGY RESPECTS YOUR FUNK AND YOUR FORM."; }
+          return "YOU FLEX, UNSCENTED. KONGY IS POLITELY UNIMPRESSED. APPRECIATE HIM FIRST."; } }
+    ],
+    killText:"KONGY CRUMBLES LIKE FINE CHEESE. THE SMELL LINGERS. IT ALWAYS WILL.",
+    spareText:"KONGY STEPS ASIDE AND GIVES YOU A CHEESE WHEEL. A TRUE BRO."
+  },
+  glacion: {
+    name:"KING GLACION", spr:glacionSpr, hp:480, atk:9, def:3, exp:150, crumbs:120, pattern:"boss",
+    check:"KING GLACION - ATK 9 DEF 3. AN ANCIENT TV DINNER, FREEZER-BURNED INTO ROYALTY. HOARDS EVERYTHING WARM.",
+    quotes:[],
+    acts:[
+      { t:"REMEMBER WARMTH", fn(e){
+          e.mercy++;
+          if (e.mercy === 1) return "YOU DESCRIBE A MICROWAVE'S GENTLE HUM. GLACION'S ICICLES DRIP, JUST A LITTLE.";
+          if (e.mercy === 2) return "YOU DESCRIBE MELTED CHEESE. GLACION'S CROWN TILTS. HIS FROST SOFTENS.";
+          e.warmed = true;
+          return "YOU DESCRIBE A SHARED MEAL, STEAM RISING. GLACION IS SHAKING. HE REMEMBERS.";
+        } },
+      { t:"HUG", fn(e){
+          if (e.warmed){ e.spareable = true; return "YOU OPEN YOUR ARMS. GLACION HESITATES... AND LEANS IN. HE IS SO COLD. HE IS SO READY."; }
+          return "YOU'D FREEZE SOLID ON CONTACT. WARM HIM UP FIRST."; } }
+    ],
+    killText:"KING GLACION SHATTERS INTO STEAM AND SILENCE.",
+    spareText:"KING GLACION MELTS INTO SOMETHING SOFTER: JUST A WARM OLD DINNER, AT PEACE."
+  }
+};
+const GROUPS = {
+  tut: ["gherkin"], shelf1: ["eggbert"], shelf2: ["gherkin", "eggbert"],
+  freezer1: ["onion"], freezer2: ["onion", "onion"],
+  kongyFight: ["kongy"], boss: ["glacion"]
+};
+const SPELLS = {
+  dorko: [ { name:"SHELL CYCLONE", cost:30, kind:"allatk", pow:1.4, desc:"SPIN INTO EVERYONE. HITS ALL." } ],
+  mega:  [ { name:"BLUE BURN", cost:25, kind:"atk", pow:2.2, desc:"COLD FIRE. BIG DAMAGE, SAPS ATTACK." } ],
+  bmo:   [ { name:"HEAL PIXEL", cost:32, kind:"heal", pow:60, desc:"RESTORE 60 HP TO AN ALLY." },
+           { name:"LULLABYTE", cost:40, kind:"slow", desc:"SING. NEXT WAVE OF BULLETS IS SLEEPY." } ]
+};
+
+let B = null;
+function startBattle(groupId, flag){
+  const ids = GROUPS[groupId];
+  const n = ids.length;
+  B = {
+    groupId, flag,
+    enemies: ids.map((id, i) => {
+      const d = ENEMY_DEFS[id];
+      return { ...d, defId:id, hp:d.hp, maxhp:d.hp, mercy:0, spareable:false, alive:true,
+               spared:false, dying:0, shake:0, flashT:0, hpShow:0, soft:false, sniffed:false,
+               warmed:false, x: n === 1 ? 160 : 100 + i * 120, y: 44, seed: i * 977 };
+    }),
+    state:"intro", stateT:0, ci:0, turn:0,
+    defend:[false,false,false], menuSel:0, subSel:0, targetSel:0, listKind:"",
+    msg:"", msgQueue:[],
+    box:{ x:98, y:70, w:124, h:96 },
+    soul:{ x:160, y:118, inv:0 },
+    bullets:[], fx:[], dmgNums:[],
+    fightX:0, fightDone:false, fightTargets:[],
+    phaseT:0, phaseLen:400, slowNext:1, curSlow:1,
+    bossPhase:1, bossDlgQueue:[], canFlee: !(groupId === "tut" || groupId === "boss" || groupId === "kongyFight"),
+    tutorial: groupId === "tut", tutHintT:0,
+    rewardExp:0, rewardCrumbs:0, endFlavor:""
+  };
+  G.mode = "battle";
+  SFX.encounter();
+  playMusic(groupId === "boss" ? "boss" : "battle");
+  B.msg = B.tutorial ? "A WILD GHERKIN JIGGLES INTO YOUR PATH!"
+        : groupId === "boss" ? "KING GLACION DESCENDS FROM HIS FROSTBITTEN THRONE!"
+        : groupId === "kongyFight" ? "KONGY GORGONZOLA BEATS HIS MAGNIFICENT CHEST!"
+        : pick(["THE COLD AIR CRACKLES!", "SNACKS APPROACH WITH INTENT!", "IT SMELLS LIKE TROUBLE. AND FOOD."]);
+  if (B.tutorial && !G.flags.tutSeen){
+    G.flags.tutSeen = 1;
+    say([
+      { p:"bmo", name:"BMO", t:"BATTLE TUTORIAL DOWNLOADED! PICK FIGHT, THEN PRESS Z WHEN THE CURSOR HITS THE GREEN CENTER!" },
+      { p:"bmo", name:"BMO", t:"OR BE NICE! ACT LETS YOU TALK IT OUT. WHEN A NAME GLOWS YELLOW, SPARE THEM!" },
+      { p:"bmo", name:"BMO", t:"ON THEIR TURN, MOVE THE HEART TO DODGE! GRAZE CLOSE TO BULLETS TO CHARGE TP FOR MAGIC!" },
+      { p:"bmo", name:"BMO", t:"DEFEND MEANS YOU TAKE THE HITS FOR THE TEAM, BUT HALVED! TEAMWORK!" }
+    ]);
+  }
+}
+function aliveEnemies(){ return B.enemies.filter(e => e.alive); }
+function aliveParty(){ return G.party.filter(p => p.hp > 0); }
+function nextChar(from){
+  for (let i = from; i < 3; i++) if (G.party[i].hp > 0) return i;
+  return -1;
+}
+function battleWon(){ return B.enemies.every(e => !e.alive); }
+
+function setState(s){ B.state = s; B.stateT = 0; B.menuSel = 0; B.subSel = 0; B.targetSel = 0; }
+
+function queueMsg(m){ B.msgQueue.push(m); }
+function popMsg(){
+  if (B.msgQueue.length){ B.msg = B.msgQueue.shift(); return true; }
+  return false;
+}
+
+// ---- damage / numbers ----
+function dmgNum(x, y, s, col){ B.dmgNums.push({ x, y, t: 50, s: String(s), col: col || "#ffffff" }); }
+function hurtEnemy(e, dmg){
+  dmg = Math.max(1, Math.round(dmg) - e.def);
+  e.hp -= dmg; e.shake = 16; e.flashT = 10; e.hpShow = 90;
+  dmgNum(e.x, e.y - 10, dmg);
+  SFX.hitEnemy();
+  shake(4, 8);
+  if (e.hp <= 0){
+    e.hp = 0; e.alive = false; e.dying = 40; G.kills++;
+    B.rewardExp += e.exp; B.rewardCrumbs += e.crumbs;
+    queueMsg(e.killText);
+    SFX.boom();
+  }
+  if (e.defId === "glacion") checkBossPhase(e);
+}
+function checkBossPhase(e){
+  const frac = e.hp / e.maxhp;
+  if (B.bossPhase === 1 && frac <= 0.66 && e.alive){
+    B.bossPhase = 2;
+    B.bossDlgQueue.push([
+      { p:"glacion", name:"KING GLACION", t:"YOU CHIP AT ME? I HAVE ENDURED A THOUSAND DEFROST CYCLES." },
+      { p:"glacion", name:"KING GLACION", t:"COLD PRESERVES. COLD PROTECTS. COLD... KEEPS THINGS FROM LEAVING." }
+    ]);
+  }
+  if (B.bossPhase === 2 && frac <= 0.33 && e.alive){
+    B.bossPhase = 3;
+    B.bossDlgQueue.push([
+      { p:"glacion", name:"KING GLACION", t:"ENOUGH!! DO YOU KNOW WHY I HOARD THE WARM THINGS?!" },
+      { p:"glacion", name:"KING GLACION", t:"EVERYTHING WARM I EVER LOVED... WENT OUT THAT DOOR AND NEVER CAME BACK." },
+      { p:"bmo", name:"BMO", t:"...DUDE. THAT'S JUST HOW EATING WORKS." },
+      { p:"glacion", name:"KING GLACION", t:"IT IS A FLAWED SYSTEM AND I REJECT IT!!" }
+    ]);
+  }
+}
+function shake(mag, dur){ G.shakeMag = mag; G.shake = dur; }
+
+// ---- battle update ----
+function updateBattle(){
+  B.stateT++;
+  if (G.shake > 0) G.shake--;
+  B.dmgNums.forEach(d => { d.t--; d.y -= 0.4; });
+  B.dmgNums = B.dmgNums.filter(d => d.t > 0);
+  B.fx.forEach(f => { f.t--; f.x += f.vx || 0; f.y += f.vy || 0; });
+  B.fx = B.fx.filter(f => f.t > 0);
+  B.enemies.forEach(e => {
+    if (e.shake > 0) e.shake--;
+    if (e.flashT > 0) e.flashT--;
+    if (e.hpShow > 0) e.hpShow--;
+    if (!e.alive && e.dying > 0) e.dying--;
+  });
+
+  if (G.dialog){ updateDialog(); return; }
+
+  switch (B.state){
+    case "intro":
+      if (B.stateT > 40) setState("menu");
+      break;
+    case "menu": updateBattleMenu(); break;
+    case "target": updateTargetSel(); break;
+    case "list": updateListSel(); break;
+    case "fightbar": updateFightBar(); break;
+    case "msg":
+      if ((B.stateT > 20 && pressed.z) || (!B.msg && B.stateT > 30)){
+        eat("z");
+        if (!popMsg()) advanceTurnFlow();
+        else B.stateT = 0;
+      }
+      break;
+    case "edlg":
+      if (B.stateT > 80 || (B.stateT > 15 && pressed.z)){ eat("z"); startBullets(); }
+      break;
+    case "bullets": updateBullets(); break;
+    case "victory":
+      if (B.stateT > 20 && pressed.z){ eat("z"); finishBattle(true); }
+      break;
+    case "spareEnd":
+      if (B.stateT > 20 && pressed.z){ eat("z"); finishBattle(true); }
+      break;
+    case "fled":
+      if (B.stateT > 20 && pressed.z){ eat("z"); finishBattle(false); }
+      break;
+  }
+}
+const COMMANDS = ["FIGHT", "ACT", "MAGIC", "ITEM", "SPARE", "DEFEND"];
+function updateBattleMenu(){
+  if (pressed.left){ eat("left"); B.menuSel = (B.menuSel + 5) % 6; SFX.move(); }
+  if (pressed.right){ eat("right"); B.menuSel = (B.menuSel + 1) % 6; SFX.move(); }
+  if (pressed.z){
+    eat("z"); SFX.confirm();
+    const cmd = COMMANDS[B.menuSel];
+    if (cmd === "FIGHT" || cmd === "ACT" || cmd === "SPARE"){
+      B.listKind = cmd; setState("target"); B.state = "target";
+    } else if (cmd === "MAGIC"){
+      B.listKind = "MAGIC"; setState("list");
+    } else if (cmd === "ITEM"){
+      if (!G.inv.length){ B.msg = "YOUR POCKETS CONTAIN ONLY HOPE."; return; }
+      B.listKind = "ITEM"; setState("list");
+    } else if (cmd === "DEFEND"){
+      B.defend[B.ci] = true;
+      G.tp = clamp(G.tp + 16, 0, 100);
+      B.msg = `${G.party[B.ci].name} GUARDS THE PARTY! TP UP!`;
+      SFX.tp();
+      endCharAction();
+    }
+  }
+}
+function targetList(){
+  const arr = aliveEnemies().map(e => ({ e, label: e.name }));
+  if (B.listKind === "SPARE" && B.canFlee) arr.push({ flee: true, label: "FLEE" });
+  return arr;
+}
+function updateTargetSel(){
+  const list = targetList();
+  if (pressed.x){
+    eat("x"); SFX.cancel();
+    if (B.listKind === "SPELLT" && B.pendingSpell) G.tp = clamp(G.tp + B.pendingSpell.cost, 0, 100);
+    setState("menu"); return;
+  }
+  if (pressed.up || pressed.left){ eat("up"); eat("left"); B.targetSel = (B.targetSel + list.length - 1) % list.length; SFX.move(); }
+  if (pressed.down || pressed.right){ eat("down"); eat("right"); B.targetSel = (B.targetSel + 1) % list.length; SFX.move(); }
+  if (pressed.z){
+    eat("z"); SFX.confirm();
+    const t = list[B.targetSel];
+    if (t.flee){
+      B.msg = pick(["YOU FLED. THE SNACKS JUDGE YOU SILENTLY.", "YOU RAN AWAY, DRAMATICALLY. NAILED IT."]);
+      setState("fled"); return;
+    }
+    if (B.listKind === "FIGHT"){
+      B.fightTargets = [t.e]; B.fightX = B.box.x - 10; B.fightDone = false; setState("fightbar");
+    } else if (B.listKind === "ACT"){
+      B.actEnemy = t.e; setState("list"); B.listKind = "ACT2";
+    } else if (B.listKind === "SPARE"){
+      doSpare(t.e);
+    } else if (B.listKind === "SPELLT"){
+      resolveAtkSpell(B.pendingSpell, t.e);
+    }
+  }
+}
+function listItems(){
+  if (B.listKind === "MAGIC") return SPELLS[G.party[B.ci].id].map(s => ({ s, label: `${s.name} ${s.cost}TP` }));
+  if (B.listKind === "ITEM") return G.inv.map((id, i) => ({ item: id, idx: i, label: ITEMS[id].name }));
+  if (B.listKind === "ACT2"){
+    const acts = [{ t:"CHECK", check:true }, ...B.actEnemy.acts];
+    return acts.map(a => ({ a, label: a.t }));
+  }
+  if (B.listKind === "ALLY" || B.listKind === "HEALALLY") return G.party.map((p, i) => ({ ally: i, label: p.name + (p.hp <= 0 ? " (DOWN)" : "") }));
+  return [];
+}
+function updateListSel(){
+  const list = listItems();
+  if (!list.length){ setState("menu"); return; }
+  if (pressed.x){
+    eat("x"); SFX.cancel();
+    if (B.listKind === "HEALALLY") G.tp = clamp(G.tp + (B.healCost || 0), 0, 100);
+    setState(B.listKind === "ACT2" ? "target" : "menu");
+    if (B.state === "target") B.listKind = "ACT";
+    return;
+  }
+  if (pressed.up){ eat("up"); B.subSel = (B.subSel + list.length - 1) % list.length; SFX.move(); }
+  if (pressed.down){ eat("down"); B.subSel = (B.subSel + 1) % list.length; SFX.move(); }
+  if (B.subSel >= list.length) B.subSel = 0;
+  if (pressed.z){
+    eat("z");
+    const sel = list[B.subSel];
+    if (B.listKind === "MAGIC"){
+      const sp = sel.s;
+      if (G.tp < sp.cost){ SFX.cancel(); B.msg = "NOT ENOUGH TP! GRAZE BULLETS OR DEFEND TO CHARGE."; return; }
+      SFX.confirm();
+      castSpell(sp);
+    } else if (B.listKind === "ITEM"){
+      SFX.confirm();
+      B.useItemIdx = sel.idx; B.listKind = "ALLY"; B.subSel = 0;
+    } else if (B.listKind === "ALLY"){
+      SFX.confirm();
+      const id = G.inv[B.useItemIdx];
+      const target = G.party[sel.ally];
+      const wasDown = target.hp <= 0;
+      useItem(id, sel.ally);
+      B.msg = `${target.name} ${wasDown ? "GOT BACK UP!" : "FEELS RESTORED!"} (${ITEMS[id].name})`;
+      dmgNum(20 + sel.ally * 100 + 40, 180, "+" + (ITEMS[id].heal || ITEMS[id].healAll), "#58e858");
+      endCharAction();
+    } else if (B.listKind === "HEALALLY"){
+      SFX.heal();
+      const target = G.party[sel.ally];
+      const wasDown = target.hp <= 0;
+      target.hp = Math.min(target.maxhp, target.hp + B.healPow);
+      B.msg = `BMO BEAMS HEALING PIXELS! ${target.name} ${wasDown ? "GOT BACK UP WITH" : "RECOVERED"} ${B.healPow} HP!`;
+      dmgNum(62 + sel.ally * 100, 178, "+" + B.healPow, "#58e858");
+      endCharAction();
+    } else if (B.listKind === "ACT2"){
+      SFX.confirm();
+      const e = B.actEnemy;
+      if (sel.a.check) B.msg = e.check;
+      else B.msg = sel.a.fn(e);
+      if (e.spareable) SFX.spare();
+      endCharAction();
+    }
+  }
+}
+function castSpell(sp){
+  const c = G.party[B.ci];
+  G.tp -= sp.cost;
+  if (sp.kind === "heal"){ B.healPow = sp.pow; B.healCost = sp.cost; B.listKind = "HEALALLY"; setState("list"); return; }
+  if (sp.kind === "slow"){
+    B.slowNext = 0.55;
+    SFX.heal();
+    B.msg = "BMO SINGS A LULLABYTE. THE AIR GETS DROWSY. BULLETS WILL BE SLEEPY.";
+    endCharAction(); return;
+  }
+  if (sp.kind === "allatk"){
+    SFX.spell();
+    aliveEnemies().forEach(e => hurtEnemy(e, (c.atk + G.lv * 2) * sp.pow));
+    spellFx("#8ecf5e");
+    B.msg = "DORKO SPINS LIKE A DESTINY FRISBEE! IT HITS EVERYONE!";
+    endCharAction(); return;
+  }
+  if (sp.kind === "atk"){
+    const targets = aliveEnemies();
+    if (targets.length > 1){ B.pendingSpell = sp; B.listKind = "SPELLT"; setState("target"); return; }
+    resolveAtkSpell(sp, targets[0]); return;
+  }
+}
+function setStateKeep(s){ B.state = s; B.stateT = 0; B.targetSel = 0; }
+function resolveAtkSpell(sp, e){
+  const c = G.party[B.ci];
+  SFX.spell();
+  hurtEnemy(e, (c.atk + G.lv * 2) * sp.pow);
+  e.atk = Math.max(1, e.atk - 2);
+  spellFx("#5ea8e8");
+  B.msg = "MEGAFIRE'S BLUE FLAME ROARS! IT'S COLD AND HOT AT ONCE! ENEMY ATTACK FELL!";
+  endCharAction();
+}
+function spellFx(col){
+  for (let i = 0; i < 24; i++)
+    B.fx.push({ x:160 + rnd(-60, 60), y:44 + rnd(-20, 20), vx:rnd(-1, 1), vy:rnd(-1.5, 0.5), t:irnd(15, 35), col, kind:"spark" });
+}
+function doSpare(e){
+  if (e.spareable){
+    e.spared = true; e.alive = false; e.dying = 40; G.spares++;
+    B.rewardCrumbs += e.crumbs + 10;
+    SFX.spare();
+    for (let i = 0; i < 16; i++)
+      B.fx.push({ x:e.x + rnd(-16, 16), y:e.y + rnd(-16, 16), vx:rnd(-0.5, 0.5), vy:rnd(-1.2, -0.2), t:irnd(20, 40), col:"#ffe14a", kind:"spark" });
+    if (e.defId === "kongy" && G.inv.length < 8){ G.inv.push("cheese"); }
+    B.msg = e.spareText;
+    if (e.defId === "glacion"){ B.msg = e.spareText; }
+  } else {
+    B.msg = e.mercy > 0 || e.soft || e.sniffed
+      ? `${e.name} IS ALMOST THERE. KEEP AT IT!`
+      : `${e.name} ISN'T READY TO STOP. (TRY ACTING FIRST)`;
+  }
+  endCharAction();
+}
+
+// ---- fight minigame ----
+function updateFightBar(){
+  const left = B.box.x - 10, right = B.box.x + B.box.w + 10;
+  B.fightX += 2.6;
+  if (pressed.z && !B.fightDone){
+    eat("z");
+    B.fightDone = true;
+    const center = (left + right) / 2;
+    const off = Math.abs(B.fightX - center);
+    const c = G.party[B.ci];
+    let mult, label = null;
+    if (off < 7){ mult = 2.3; label = "CRIT!!"; SFX.levelup(); }
+    else { mult = Math.max(0.35, 1.9 - off / 55); SFX.slash(); }
+    const e = B.fightTargets[0];
+    slashFx(e);
+    hurtEnemy(e, (c.atk + G.lv * 2 + irnd(0, 3)) * mult);
+    if (label) dmgNum(e.x, e.y - 22, label, "#ffe14a");
+    B.msg = "";
+    setTimeoutState();
+    return;
+  }
+  if (B.fightX > right + 10 && !B.fightDone){
+    B.fightDone = true;
+    SFX.miss();
+    B.msg = `${G.party[B.ci].name} WHIFFS COMPLETELY. THE AIR IS UNHARMED.`;
+    dmgNum(B.fightTargets[0].x, B.fightTargets[0].y - 10, "MISS", "#8a93a8");
+    setTimeoutState();
+  }
+}
+function setTimeoutState(){ endCharAction(); }
+function slashFx(e){
+  for (let i = 0; i < 3; i++)
+    B.fx.push({ x:e.x - 12 + i * 4, y:e.y - 14 + i * 9, vx:2.5, vy:0.6, t:12 + i * 3, col:"#ffffff", kind:"slash" });
+}
+
+// ---- turn flow ----
+function endCharAction(){
+  // after a character acts: message state, then next char or enemy turn
+  if (battleWon()){
+    setState("msg");
+    if (!B.msg) popMsg();
+    B.afterMsg = "end";
+    return;
+  }
+  setState("msg");
+  if (!B.msg) popMsg();
+  B.afterMsg = "next";
+}
+function advanceTurnFlow(){
+  if (B.afterMsg === "end" || battleWon()){ startVictory(); return; }
+  const ni = nextChar(B.ci + 1);
+  if (ni === -1){ startEnemyTurn(); }
+  else { B.ci = ni; setState("menu"); B.msg = defaultMsg(); }
+}
+function defaultMsg(){
+  const e = aliveEnemies()[0];
+  if (!e) return "";
+  if (B.groupId === "boss") return "GLACION'S COLD GAZE SETTLES ON YOU.";
+  return pick([
+    `${e.name} ${e.defId === "kongy" ? "FLEXES MAGNIFICENTLY." : "SHUFFLES MENACINGLY."}`,
+    `THE AIR SMELLS LIKE ${e.defId === "gherkin" ? "VINEGAR" : e.defId === "eggbert" ? "BREAKFAST" : e.defId === "onion" ? "TEARS" : "CHEESE"}.`,
+    `${e.name} EYES THE PARTY.`,
+    e.spareable ? `${e.name} IS READY TO BE SPARED!` : `${e.name} HOLDS ITS GROUND.`
+  ]);
+}
+function startVictory(){
+  playJingle("victory");
+  const allSpared = B.enemies.every(e => e.spared);
+  let m = allSpared ? "PEACE ACHIEVED! " : "YOU WON! ";
+  m += `GOT ${B.rewardCrumbs} CRUMBS`;
+  G.crumbs += B.rewardCrumbs;
+  if (B.rewardExp > 0){
+    G.exp += B.rewardExp;
+    m += ` AND ${B.rewardExp} EXP`;
+  }
+  m += "!";
+  while (G.exp >= G.lv * 40){
+    G.exp -= G.lv * 40; G.lv++;
+    G.party.forEach(p => { p.atk += 2; p.maxhp += 8; p.hp = Math.min(p.maxhp, p.hp + 20); });
+    m += ` LV UP! NOW LV ${G.lv}!`;
+    SFX.levelup();
+  }
+  B.msg = m;
+  setState("victory");
+}
+function startEnemyTurn(){
+  // boss scripted dialogue first if queued
+  if (B.bossDlgQueue.length){
+    const script = B.bossDlgQueue.shift();
+    say(script, () => { enemyBubble(); });
+    return;
+  }
+  enemyBubble();
+}
+function enemyBubble(){
+  const e = aliveEnemies()[0];
+  if (!e){ startVictory(); return; }
+  if (B.groupId === "boss"){
+    const lines = {
+      1: ["KNEEL BEFORE THE CRISPER CROWN!", "MY BREATH IS A BLIZZARD, MY HEART A LEFTOVER.", "YOU SEEK THE ROLLS? THEY ARE MINE TO KEEP COLD."],
+      2: ["WHY WON'T YOU SHIVER?!", "I HAVE BEEN COLD SO LONG I FORGOT THE POINT OF IT.", "STAY. EVERYTHING THAT STAYS, STAYS FRESH."],
+      3: ["I DON'T WANT TO BE LEFTOVER AGAIN!!", "COLD KEEPS! COLD KEEPS!! COLD KEEPS!!!", "PLEASE... JUST... STAY..."]
+    }[B.bossPhase];
+    B.bubble = { text: lines[B.turn % lines.length], e };
+  } else {
+    B.bubble = { text: pick(e.quotes), e };
+  }
+  setState("edlg");
+  SFX.blip2();
+}
+function startBullets(){
+  B.bubble = null;
+  B.bullets = [];
+  B.soul.x = B.box.x + B.box.w / 2; B.soul.y = B.box.y + B.box.h / 2; B.soul.inv = 0;
+  B.phaseT = 0;
+  B.phaseLen = B.groupId === "boss" ? 430 + B.bossPhase * 30 : 380;
+  B.curSlow = B.slowNext; B.slowNext = 1;
+  B.tutHintT = B.tutorial ? 240 : 0;
+  setState("bullets");
+}
+function endBullets(){
+  B.bullets = [];
+  B.turn++;
+  B.defend = [false, false, false];
+  B.ci = nextChar(0);
+  setState("menu");
+  B.msg = defaultMsg();
+}
+
+// ---- bullet patterns ----
+function spawnBullet(b){ b.grazed = false; b.t = 0; B.bullets.push(b); }
+function updateBullets(){
+  B.phaseT++;
+  const sp = held.x ? 0.85 : 1.75;
+  const s = B.soul;
+  if (held.left) s.x -= sp; if (held.right) s.x += sp;
+  if (held.up) s.y -= sp; if (held.down) s.y += sp;
+  s.x = clamp(s.x, B.box.x + 5, B.box.x + B.box.w - 5);
+  s.y = clamp(s.y, B.box.y + 5, B.box.y + B.box.h - 5);
+  if (s.inv > 0) s.inv--;
+
+  // spawners
+  for (const e of aliveEnemies()) runPattern(e);
+
+  const slow = B.curSlow;
+  for (const b of B.bullets){
+    b.t++;
+    if (b.kind === "homing"){
+      const d = Math.hypot(s.x - b.x, s.y - b.y) || 1;
+      b.vx += (s.x - b.x) / d * 0.05; b.vy += (s.y - b.y) / d * 0.05;
+      const v = Math.hypot(b.vx, b.vy);
+      if (v > 1.6){ b.vx = b.vx / v * 1.6; b.vy = b.vy / v * 1.6; }
+    }
+    b.x += b.vx * slow; b.y += b.vy * slow;
+    if (b.kind === "bounce"){
+      if (b.x < B.box.x + b.r || b.x > B.box.x + B.box.w - b.r){ b.vx *= -1; b.x = clamp(b.x, B.box.x + b.r, B.box.x + B.box.w - b.r); }
+      if (b.y < B.box.y + b.r || b.y > B.box.y + B.box.h - b.r){ b.vy *= -1; b.y = clamp(b.y, B.box.y + b.r, B.box.y + B.box.h - b.r); }
+    }
+    // graze + hit
+    const d = Math.hypot(s.x - b.x, s.y - b.y);
+    if (d < b.r + 3){
+      if (s.inv <= 0){
+        s.inv = 60;
+        const dmg = b.dmg + irnd(0, 2);
+        applyPartyDamage(dmg);
+      }
+    } else if (d < b.r + 12 && !b.grazed){
+      b.grazed = true;
+      G.tp = clamp(G.tp + 2.5, 0, 100);
+      SFX.graze();
+      B.fx.push({ x: s.x + rnd(-4, 4), y: s.y + rnd(-4, 4), vx:0, vy:-0.8, t:14, col:"#ffe14a", kind:"spark" });
+    }
+  }
+  B.bullets = B.bullets.filter(b =>
+    b.t < (b.life || 900) &&
+    b.x > B.box.x - 30 && b.x < B.box.x + B.box.w + 30 &&
+    b.y > B.box.y - 30 && b.y < B.box.y + B.box.h + 30
+  );
+  if (aliveParty().length === 0){ startGameOver(); return; }
+  if (B.phaseT >= B.phaseLen) endBullets();
+}
+function applyPartyDamage(dmg){
+  let idx = B.defend.findIndex((d, i) => d && G.party[i].hp > 0);
+  let mult = 1;
+  if (idx >= 0) mult = 0.5;
+  else {
+    const alive = G.party.map((p, i) => i).filter(i => G.party[i].hp > 0);
+    idx = pick(alive);
+  }
+  const p = G.party[idx];
+  const final = Math.max(1, Math.round(dmg * mult));
+  p.hp = Math.max(0, p.hp - final);
+  dmgNum(62 + idx * 100, 178, final, "#ff5858");
+  SFX.hurt();
+  shake(5, 10);
+  G.flash = { color: "rgba(255,60,60,0.35)", a: 0.5 };
+  if (p.hp <= 0) dmgNum(62 + idx * 100, 188, "DOWN!", "#ff5858");
+}
+function runPattern(e){
+  const t = B.phaseT, box = B.box;
+  const pat = e.pattern === "boss" ? null : e.pattern;
+  const spdMul = (e.soft ? 0.75 : 1) * (B.groupId === "boss" ? 1 + (B.bossPhase - 1) * 0.18 : 1);
+  if (e.pattern === "boss"){ bossPattern(e, t, spdMul); return; }
+  if (pat === "aimed"){
+    if (t % 46 === 8){
+      aimShot(e, box, 2.1 * spdMul, "#8ecf5e", "pickle", 4);
+      if (e.maxhp - e.hp > 20){ aimShot(e, box, 2.1 * spdMul, "#8ecf5e", "pickle", 4, 0.35); aimShot(e, box, 2.1 * spdMul, "#8ecf5e", "pickle", 4, -0.35); }
+    }
+  } else if (pat === "waves"){
+    if (t % 34 === 10){
+      const gap = (Math.sin(t * 0.02 + e.seed) * 0.5 + 0.5) * (box.w - 40) + box.x + 20;
+      for (let x = box.x + 8; x < box.x + box.w - 4; x += 22){
+        if (Math.abs(x - gap) < 20) continue;
+        spawnBullet({ x, y: box.y + 4, vx: Math.sin((x + t) * 0.1) * 0.3, vy: 1.25 * spdMul, r: 4, dmg: e.atk, col:"#f2ede2", kind:"egg" });
+      }
+    }
+  } else if (pat === "spiral"){
+    if (t % 11 === 0){
+      const a = t * 0.19 + e.seed;
+      for (let k = 0; k < 2; k++){
+        const ang = a + k * Math.PI;
+        spawnBullet({ x: box.x + box.w / 2, y: box.y + box.h / 2 - 14,
+          vx: Math.cos(ang) * 1.3 * spdMul, vy: Math.sin(ang) * 1.3 * spdMul,
+          r: 4, dmg: e.atk, col:"#e8c99a", kind:"ring" });
+      }
+    }
+  } else if (pat === "bounce"){
+    const count = B.bullets.filter(b => b.kind === "bounce").length;
+    if (t % 70 === 20 && count < 4){
+      const ang = rnd(0.5, 1.2) + pick([0, Math.PI / 2, Math.PI, -Math.PI / 2]);
+      spawnBullet({ x: box.x + box.w / 2 + rnd(-30, 30), y: box.y + 10,
+        vx: Math.cos(ang) * 1.7 * spdMul, vy: Math.abs(Math.sin(ang)) * 1.7 * spdMul + 0.4,
+        r: 6, dmg: e.atk + 1, col:"#e8c25c", kind:"bounce", life: 320 });
+    }
+  }
+}
+function aimShot(e, box, spd, col, kind, r, angOff = 0){
+  const sx = clamp(e.x, box.x + 10, box.x + box.w - 10), sy = box.y + 6;
+  const a = Math.atan2(B.soul.y - sy, B.soul.x - sx) + angOff;
+  spawnBullet({ x: sx, y: sy, vx: Math.cos(a) * spd, vy: Math.sin(a) * spd, r, dmg: e.atk, col, kind });
+}
+function bossPattern(e, t, spdMul){
+  const box = B.box, ph = B.bossPhase;
+  if (ph >= 1){
+    if (t % (ph === 1 ? 40 : 55) === 6) aimShot(e, box, 2.2 * spdMul, "#9fd8f0", "shard", 4);
+    if (ph === 1 && t % 44 === 22){
+      const gap = (Math.sin(t * 0.017) * 0.5 + 0.5) * (box.w - 44) + box.x + 22;
+      for (let x = box.x + 10; x < box.x + box.w - 4; x += 24)
+        if (Math.abs(x - gap) >= 20)
+          spawnBullet({ x, y: box.y + 4, vx: 0, vy: 1.3 * spdMul, r: 4, dmg: e.atk, col:"#d8f0ff", kind:"shard" });
+    }
+  }
+  if (ph >= 2){
+    if (t % 13 === 0){
+      const a = t * 0.16;
+      spawnBullet({ x: box.x + box.w / 2, y: box.y + box.h / 2 - 10,
+        vx: Math.cos(a) * 1.35 * spdMul, vy: Math.sin(a) * 1.35 * spdMul, r: 4, dmg: e.atk, col:"#9fd8f0", kind:"ring" });
+    }
+    if (t % 95 === 40 && B.bullets.filter(b => b.kind === "bounce").length < 3)
+      spawnBullet({ x: box.x + 20, y: box.y + 12, vx: 1.6 * spdMul, vy: 1.4 * spdMul, r: 6, dmg: e.atk + 1, col:"#7fb0e0", kind:"bounce", life: 300 });
+  }
+  if (ph >= 3){
+    if (t % 120 === 60)
+      spawnBullet({ x: box.x + (t % 240 === 60 ? 8 : box.w - 8), y: box.y + 8, vx: 0.5, vy: 0.5, r: 5, dmg: e.atk + 2, col:"#e0f4ff", kind:"homing", life: 260 });
+    if (t % 44 === 22){
+      const gap = (Math.cos(t * 0.021) * 0.5 + 0.5) * (box.w - 44) + box.x + 22;
+      for (let x = box.x + 10; x < box.x + box.w - 4; x += 24)
+        if (Math.abs(x - gap) >= 18)
+          spawnBullet({ x, y: box.y + 4, vx: 0, vy: 1.45 * spdMul, r: 4, dmg: e.atk, col:"#d8f0ff", kind:"shard" });
+    }
+  }
+}
+
+// ---- battle end ----
+function finishBattle(won){
+  const wasBoss = B.groupId === "boss";
+  const allSpared = B.enemies.every(e => e.spared);
+  const flag = B.flag;
+  if (won && flag) G.flags[flag] = true;
+  if (won && wasBoss){
+    G.flags.bossDone = true;
+    G.flags.bossSpared = allSpared;
+  }
+  if (won && B.groupId === "kongyFight") G.flags.kongySpared = allSpared;
+  B = null;
+  G.mode = "world";
+  G.invuln = 100;
+  G.party.forEach(p => { if (p.hp <= 0) p.hp = 1; });
+  playMusic(ROOMS[G.roomId].music);
+  if (won && wasBoss) setTimeout(() => { if (G.mode === "world" && !G.dialog) say(postBossScript()); }, 400);
+}
+
+// ---- battle render ----
+function drawBattle(){
+  ctx.save();
+  if (G.shake > 0) ctx.translate(irnd(-G.shakeMag, G.shakeMag), irnd(-G.shakeMag, G.shakeMag));
+  // background
+  const boss = B.groupId === "boss";
+  const grd = ctx.createLinearGradient(0, 0, 0, H);
+  grd.addColorStop(0, boss ? "#101a38" : "#181428");
+  grd.addColorStop(1, "#060810");
+  ctx.fillStyle = grd; ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = boss ? "#1a2a52" : "#241e3e";
+  for (let x = 0; x < W; x += 32) for (let y = 0; y < 70; y += 32)
+    if ((x + y) % 64 === 0) ctx.fillRect(x + 10, y + 6, 10, 10);
+
+  // intro zoom flash
+  if (B.state === "intro" && B.stateT < 14 && B.stateT % 4 < 2){
+    ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, W, H);
+  }
+
+  // enemies
+  for (const e of B.enemies){
+    if (!e.alive && e.dying <= 0) continue;
+    const sc = e.defId === "glacion" ? 2.4 : 2;
+    const w = e.spr.width * sc, h = e.spr.height * sc;
+    const yo = Math.sin((G.t + e.seed) / 22) * 2;
+    const sx = e.shake > 0 ? irnd(-2, 2) : 0;
+    let alpha = 1;
+    if (!e.alive) alpha = e.dying / 40;
+    ctx.globalAlpha = alpha;
+    drawSpr(e.spr, e.x - w / 2 + sx, e.y - h / 2 + yo, { scale: sc });
+    if (e.flashT > 0 && e.flashT % 2 === 0){
+      ctx.globalAlpha = 0.6; ctx.fillStyle = "#ffffff";
+      ctx.fillRect(e.x - w / 2, e.y - h / 2 + yo, w, h);
+    }
+    ctx.globalAlpha = 1;
+    if (e.alive && B.state !== "bullets"){
+      drawTextC(e.name, e.x, e.y + h / 2 + 3, e.spareable ? "#ffe14a" : "#c9c9d8");
+      if (e.hpShow > 0){
+        ctx.fillStyle = "#3a3f52"; ctx.fillRect(e.x - 20, e.y - h / 2 - 8, 40, 4);
+        ctx.fillStyle = "#58c858"; ctx.fillRect(e.x - 20, e.y - h / 2 - 8, Math.max(0, 40 * e.hp / e.maxhp), 4);
+      }
+      if (e.spareable && (G.t >> 4) % 2 === 0) drawText("@", e.x + w / 2 + 2, e.y - h / 2, "#ffe14a");
+    }
+  }
+
+  // TP bar
+  drawText("TP", 78, 60, "#f0a030");
+  ctx.fillStyle = "#3a3f52"; ctx.fillRect(80, 70, 8, 96);
+  const tph = Math.round(96 * G.tp / 100);
+  ctx.fillStyle = "#f0a030"; ctx.fillRect(80, 166 - tph, 8, tph);
+  drawText(Math.round(G.tp) + "%", 70, 170, "#f0a030");
+
+  // box / message area
+  const bx = B.box;
+  if (B.state === "bullets"){
+    drawBox(bx.x - 3, bx.y - 3, bx.w + 6, bx.h + 6, "#000000", "#ffffff");
+    // timer bar
+    ctx.fillStyle = "#3a3f52"; ctx.fillRect(bx.x, bx.y + bx.h + 6, bx.w, 3);
+    ctx.fillStyle = "#f0a030"; ctx.fillRect(bx.x, bx.y + bx.h + 6, bx.w * (1 - B.phaseT / B.phaseLen), 3);
+    // bullets
+    for (const b of B.bullets) drawBullet(b);
+    // soul
+    const s = B.soul;
+    if (s.inv <= 0 || (G.t >> 2) % 2 === 0) ctx.drawImage(soulSpr, s.x - 3, s.y - 3);
+    if (held.x){ ctx.fillStyle = "rgba(255,255,255,0.8)"; ctx.fillRect(s.x - 1, s.y - 1, 2, 2); }
+    if (B.tutHintT > 0){
+      B.tutHintT--;
+      drawTextC("DODGE! GRAZE CLOSE TO BULLETS FOR TP!", 160, bx.y + bx.h + 14, "#ffe14a");
+    }
+  } else if (B.state === "fightbar"){
+    const left = bx.x - 10, right = bx.x + bx.w + 10;
+    drawBox(left - 4, 108, right - left + 8, 30, "#000000", "#ffffff");
+    ctx.fillStyle = "#2a4a2a"; ctx.fillRect((left + right) / 2 - 14, 112, 28, 22);
+    ctx.fillStyle = "#58c858"; ctx.fillRect((left + right) / 2 - 5, 112, 10, 22);
+    ctx.fillStyle = "#ffffff"; ctx.fillRect(B.fightX - 2, 110, 4, 26);
+    drawTextC("PRESS Z!", 160, 100, "#ffe14a");
+  } else if (B.bubble && B.state === "edlg"){
+    const e = B.bubble.e;
+    const lines = wrapText(B.bubble.text, 24);
+    const bw = Math.max(...lines.map(l => textW(l))) + 16;
+    const bxp = clamp(e.x - bw / 2, 4, W - bw - 4), byp = 74;
+    drawBox(bxp, byp, bw, lines.length * 10 + 12, "#ffffff", "#ffffff");
+    lines.forEach((l, i) => drawText(l, bxp + 8, byp + 6 + i * 10, "#14141c"));
+  } else {
+    // message text
+    const lines = wrapText(B.msg || "", 34);
+    lines.slice(0, 4).forEach((l, i) => drawText("* " + l, 96, 84 + i * 12));
+    if ((B.state === "msg" || B.state === "victory" || B.state === "fled" || B.state === "spareEnd") && B.stateT > 20 && (G.t >> 4) % 2 === 0)
+      drawText("@", 300, 158, "#e03050");
+  }
+
+  // submenus
+  if (B.state === "target"){
+    const list = targetList();
+    drawBox(96, 96, 128, 16 + list.length * 11);
+    drawText(B.listKind === "SPARE" ? "SPARE WHO?" : B.listKind === "ACT" ? "ACT ON?" : "TARGET?", 104, 100, "#8a93a8");
+    list.forEach((t, i) => {
+      const col = t.e && t.e.spareable ? "#ffe14a" : (i === B.targetSel ? "#ffffff" : "#9aa2b8");
+      drawText(t.label, 116, 110 + i * 11, i === B.targetSel ? (t.e && t.e.spareable ? "#ffe14a" : "#ffffff") : col);
+      if (i === B.targetSel) ctx.drawImage(soulSpr, 106, 111 + i * 11);
+    });
+  }
+  if (B.state === "list"){
+    const list = listItems();
+    drawBox(88, 92, 150, 18 + Math.max(1, list.length) * 11);
+    const title = { MAGIC:"MAGIC (TP)", ITEM:"ITEMS", ACT2:"ACT HOW?", ALLY:"USE ON WHO?" }[B.listKind] || "";
+    drawText(title, 96, 96, "#8a93a8");
+    list.forEach((it, i) => {
+      let col = i === B.subSel ? "#ffffff" : "#9aa2b8";
+      if (B.listKind === "MAGIC" && G.tp < it.s.cost) col = "#5a5f72";
+      drawText(it.label, 108, 107 + i * 11, col);
+      if (i === B.subSel) ctx.drawImage(soulSpr, 98, 108 + i * 11);
+    });
+    if (B.listKind === "MAGIC" && list[B.subSel])
+      drawText(list[B.subSel].s.desc, 12, 62, "#8a93a8");
+  }
+
+  // fx
+  for (const f of B.fx){
+    if (f.kind === "slash"){
+      ctx.fillStyle = f.col; ctx.fillRect(f.x, f.y, 10, 2);
+    } else {
+      ctx.fillStyle = f.col; ctx.fillRect(f.x, f.y, 2, 2);
+    }
+  }
+  // damage numbers
+  for (const d of B.dmgNums) drawTextC(d.s, d.x, d.y, d.col);
+
+  // party panels
+  G.party.forEach((p, i) => {
+    const x = 12 + i * 100, y = 176;
+    const active = B.state !== "bullets" && B.ci === i && ["menu", "target", "list", "fightbar"].includes(B.state);
+    drawBox(x, y, 96, 34, p.hp <= 0 ? "#1a1218" : "#101018", active ? "#ffe14a" : "#5a5f72");
+    drawText(p.name, x + 6, y + 4, p.hp <= 0 ? "#5a5f72" : p.col);
+    hpBar(x + 6, y + 14, 56, p.hp, p.maxhp);
+    drawText(p.hp <= 0 ? "DOWN" : `${p.hp}`, x + 66, y + 12, p.hp <= 0 ? "#e05858" : "#c9c9d8");
+    if (B.defend[i]) drawText("GRD", x + 66, y + 24, "#5ea8e8");
+    if (active && (G.t >> 4) % 2 === 0) ctx.drawImage(soulSpr, x + 86, y + 4);
+  });
+
+  // command row
+  if (B.state === "menu" || B.state === "target" || B.state === "list"){
+    let cx = 14;
+    COMMANDS.forEach((c, i) => {
+      const selCol = B.state === "menu" && B.menuSel === i ? "#ffe14a" : "#9aa2b8";
+      drawText(c, cx + 8, 218, selCol);
+      if (B.state === "menu" && B.menuSel === i) ctx.drawImage(soulSpr, cx, 219);
+      cx += textW(c) + 16;
+    });
+    if (B.state === "menu")
+      drawTextC(`${G.party[B.ci].name}'S MOVE`, 160, 230, G.party[B.ci].col);
+  }
+  if (B.state === "bullets"){
+    drawTextC("ARROWS: MOVE   HOLD X: FOCUS", 160, 224, "#5a5f72");
+  }
+  ctx.restore();
+  if (G.flash){
+    ctx.globalAlpha = G.flash.a; ctx.fillStyle = G.flash.color; ctx.fillRect(0, 0, W, H);
+    ctx.globalAlpha = 1;
+    G.flash.a -= 0.06; if (G.flash.a <= 0) G.flash = null;
+  }
+  drawDialog();
+}
+function drawBullet(b){
+  ctx.fillStyle = b.col;
+  if (b.kind === "pickle"){
+    ctx.save(); ctx.translate(b.x, b.y); ctx.rotate(Math.atan2(b.vy, b.vx));
+    ctx.fillRect(-5, -2, 10, 4); ctx.restore();
+  } else if (b.kind === "ring"){
+    ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, 7); ctx.fill();
+    ctx.fillStyle = "#14141c"; ctx.beginPath(); ctx.arc(b.x, b.y, b.r - 2, 0, 7); ctx.fill();
+  } else if (b.kind === "bounce"){
+    ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, 7); ctx.fill();
+    ctx.fillStyle = "#b8923c";
+    ctx.fillRect(b.x - 1, b.y - b.r + 1, 2, b.r * 2 - 2);
+  } else if (b.kind === "egg"){
+    ctx.beginPath(); ctx.ellipse(b.x, b.y, b.r - 1, b.r + 1, 0, 0, 7); ctx.fill();
+  } else if (b.kind === "homing"){
+    const pulse = 1 + Math.sin(G.t / 4) * 0.3;
+    ctx.beginPath(); ctx.arc(b.x, b.y, b.r * pulse, 0, 7); ctx.fill();
+  } else {
+    ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, 7); ctx.fill();
+  }
+}
+
+// ================= STORY / CUTSCENES =================
+function newGame(){
+  G.party = newParty();
+  G.tp = 0; G.crumbs = 30; G.inv = ["crust", "crust", "juice"];
+  G.lv = 1; G.exp = 0; G.kills = 0; G.spares = 0; G.flags = {};
+  for (const k in talkCounts) delete talkCounts[k];
+  enterRoom("landing", 60, 150, true);
+  G.mode = "world";
+  G.fade.a = 1; G.fade.dir = 0; G.fade.cb = null; // hold black for narration
+  say([
+    { t:"SOMEWHERE IN A KITCHEN, AT PRECISELY SNACK O'CLOCK..." },
+    { p:"dorko", name:"DORKO", t:"THE FREEZER! MY TRIANGLE SENSES ARE TINGLING. PIZZA ROLLS ARE NEAR." },
+    { p:"mega", name:"MEGAFIRE", t:"DORKO, WE'VE SEARCHED FOR HOURS. THE FREEZER IS EMPTY. LIKE MY STOMACH. AND, INCREASINGLY, MY HEART." },
+    { p:"bmo", name:"BMO", t:"GUYS. THE SHELF UNDER ME FEELS WEIRDLY LIKE A TRAPDOO-" },
+    { t:"THE SHELF GIVES WAY." }
+  ], () => {
+    SFX.fall();
+    G.fade.dir = -1;
+    setTimeout(() => { SFX.boom(); shake(6, 20); }, 500);
+    say([
+      { p:"dorko", name:"DORKO", t:"EVERYONE ALIVE? SOUND OFF." },
+      { p:"mega", name:"MEGAFIRE", t:"COLD. BUT ALIVE." },
+      { p:"bmo", name:"BMO", t:"I LANDED ON MY HAT. MY HAT IS FINE. I AM ALSO FINE, THANKS FOR ASKING." },
+      { t:"YOU HAVE FALLEN INTO THE COLD WORLD... THE SECRET KINGDOM INSIDE THE FRIDGE." },
+      { p:"mega", name:"MEGAFIRE", t:"...THE FRIDGE HAS A KINGDOM? WE PUT LEFTOVERS IN A KINGDOM?" },
+      { p:"bmo", name:"BMO", t:"NEW QUEST ACQUIRED: FIND THE MYTHICAL PIZZA ROLLS. LET'S ROLL." },
+      { p:"dorko", name:"DORKO", t:"...NICE. OKAY. EAST LOOKS PROMISING. WATCH OUT FOR ANGRY SNACKS." }
+    ], () => { G.flags.introDone = 1; saveGame(); });
+  });
+}
+
+function kongyScript(){
+  if (G.flags.kongyDone){
+    return [{ t:"THE FREEZER GATE STANDS OPEN. A FAINT SMELL OF PREMIUM CHEESE LINGERS." }];
+  }
+  return [
+    { p:"kongy", name:"KONGY", t:"HALT. KONGY GUARDS THE FREEZER GATE." },
+    { p:"kongy", name:"KONGY", t:"KONGY IS A GORILLA. KONGY IS ALSO GORGONZOLA. DO NOT ASK HOW. IT INVOLVED A MIRACLE AND A DAIRY ACCIDENT." },
+    { p:"dorko", name:"DORKO", t:"WE NEED THROUGH, BIG GUY. OFFICIAL PIZZA ROLLS BUSINESS." },
+    { p:"kongy", name:"KONGY", t:"THE ONLY BUSINESS HERE IS MONKEY BUSINESS. AND ARTISANAL CHEESE. PREPARE!" },
+    { fn(){ startBattle("kongyFight", "kongyDone"); }, t:"KONGY POUNDS THE GROUND!" }
+  ];
+}
+function bossIntroScript(){
+  return [
+    { p:"glacion", name:"KING GLACION", t:"SO. THE WARM ONES COME CRAWLING FOR MY TREASURE." },
+    { p:"glacion", name:"KING GLACION", t:"I AM GLACION. FIRST OF THE FROST. KING OF LEFTOVERS. DUKE OF THE DEEP CHILL." },
+    { p:"dorko", name:"DORKO", t:"COOL CROWN. LOVE THE ICICLES. WE'RE HERE FOR THE PIZZA ROLLS." },
+    { p:"glacion", name:"KING GLACION", t:"THE ROLLS STAY. WARM THINGS ALWAYS LEAVE... SO NOTHING HERE IS ALLOWED TO BE WARM." },
+    { p:"mega", name:"MEGAFIRE", t:"(PSST. THIS GUY IS NOT OKAY.)" },
+    { p:"bmo", name:"BMO", t:"(SHH. WE'LL UNPACK IT IN BATTLE.)" },
+    { p:"glacion", name:"KING GLACION", t:"FACE THE COLD!!" },
+    { fn(){ startBattle("boss", null); }, t:"" }
+  ];
+}
+function postBossScript(){
+  if (G.flags.bossSpared){
+    return [
+      { p:"glacion", name:"KING GLACION", t:"...WARM. I HAD FORGOTTEN WARM. TAKE THE ROLLS, LITTLE ONES. THEY WERE NEVER MINE TO KEEP." },
+      { p:"dorko", name:"DORKO", t:"YOU COULD COME UP TO THE CRISPER SOMETIME, YOUR FROSTINESS. THEY HAVE A BAKERY." },
+      { p:"glacion", name:"KING GLACION", t:"A... BAKERY. YES. I WOULD LIKE THAT VERY MUCH." },
+      { t:"THE SHRINE ON THE DAIS BEGINS TO GLOW." }
+    ];
+  }
+  return [
+    { t:"THE THRONE SITS EMPTY. THE FREEZER FEELS LESS LIKE A KINGDOM NOW, AND MORE LIKE A BOX." },
+    { p:"mega", name:"MEGAFIRE", t:"...WE DID WHAT WE HAD TO. FOR THE ROLLS." },
+    { p:"bmo", name:"BMO", t:"POUR ONE OUT FOR THE COLD KING. RESPECTFULLY. ...OKAY. SHRINE TIME." },
+    { t:"THE SHRINE ON THE DAIS BEGINS TO GLOW." }
+  ];
+}
+function endingScript(){
+  if (G.flags.gotRolls) return [{ t:"THE SHRINE IS EMPTY NOW. YOUR HEARTS (AND STOMACHS) ARE NOT." }];
+  return [
+    { t:"THE MYTHICAL PIZZA ROLLS. THEY GLOW WITH ANCIENT MICROWAVE ENERGY." },
+    { p:"dorko", name:"DORKO", t:"WE FOUND THEM. WE ACTUALLY FOUND THEM." },
+    { p:"mega", name:"MEGAFIRE", t:"THEY'RE FREEZER-BURNED... THEY'RE BEAUTIFUL... THEY'RE PERFECT." },
+    { p:"bmo", name:"BMO", t:"GROUP HUG. THAT'S A SPELL NOW. ZERO TP COST. UNLIMITED USES." },
+    { t:"YOU EAT THE MYTHICAL PIZZA ROLLS TOGETHER. THE INSIDES ARE TOO HOT. THE INSIDES ARE ALWAYS TOO HOT." },
+    { t:"AND FOR ONE PERFECT SNACK O'CLOCK, THE COLD WORLD FEELS WARM.",
+      fn(){
+        G.flags.gotRolls = 1; saveGame();
+        SFX.eat();
+        G.mode = "end"; G.endTimer = 0;
+        playJingle("victory");
+      } }
+  ];
+}
+
+// ================= GAME OVER =================
+let GO = null;
+function startGameOver(){
+  B = null; GO = { t: 0, shards: [] };
+  G.mode = "gameover";
+  stopMusic();
+  playJingle("gameover");
+}
+function updateGameOver(){
+  GO.t++;
+  if (GO.t === 60){
+    SFX.shatter();
+    for (let i = 0; i < 14; i++)
+      GO.shards.push({ x: 160, y: 100, vx: rnd(-2.2, 2.2), vy: rnd(-3, -0.5), t: 0 });
+  }
+  GO.shards.forEach(s => { s.t++; s.x += s.vx; s.y += s.vy; s.vy += 0.08; });
+  if (GO.t > 140 && pressed.z){
+    eat("z"); SFX.confirm();
+    GO = null;
+    if (hasSave() && loadGame()) G.mode = "world";
+    else newGame();
+  }
+}
+function drawGameOver(){
+  ctx.fillStyle = "#060408"; ctx.fillRect(0, 0, W, H);
+  if (GO.t < 60){
+    const blink = (GO.t >> 3) % 2 === 0;
+    if (blink || GO.t < 30) drawSpr(soulSpr, 160 - 10, 100 - 9, { scale: 3 });
+  } else {
+    ctx.fillStyle = "#e03050";
+    GO.shards.forEach(s => { if (s.y < H) ctx.fillRect(s.x, s.y, 3, 3); });
+  }
+  if (GO.t > 90){
+    ctx.save(); ctx.scale(2, 2);
+    drawTextC("GAME OVER", 80, 30, "#e03050");
+    ctx.restore();
+    drawTextC("YOU CANNOT GIVE UP JUST YET...", 160, 140, "#c9c9d8");
+    drawTextC("THE PIZZA ROLLS STILL BELIEVE IN YOU.", 160, 152, "#c9c9d8");
+    if (GO.t > 140 && (G.t >> 4) % 2 === 0)
+      drawTextC("PRESS Z TO RETRY", 160, 180, "#ffe14a");
+  }
+}
+
+// ================= TITLE =================
+function gotoTitle(){ G.mode = "title"; G.titleSel = 0; playMusic("town"); }
+function titleOptions(){ return hasSave() ? ["CONTINUE", "NEW GAME"] : ["NEW GAME"]; }
+function updateTitle(){
+  const opts = titleOptions();
+  if (pressed.up || pressed.down){ eat("up"); eat("down"); G.titleSel = (G.titleSel + 1) % opts.length; SFX.move(); }
+  if (pressed.z){
+    eat("z"); SFX.confirm();
+    const sel = opts[G.titleSel];
+    if (sel === "CONTINUE"){ if (loadGame()){ G.mode = "world"; } else newGame(); }
+    else newGame();
+  }
+}
+function drawTitle(){
+  const grd = ctx.createLinearGradient(0, 0, 0, H);
+  grd.addColorStop(0, "#0c1230"); grd.addColorStop(1, "#04050c");
+  ctx.fillStyle = grd; ctx.fillRect(0, 0, W, H);
+  // snow
+  ctx.fillStyle = "#9fb8d8";
+  for (let i = 0; i < 40; i++){
+    const sx = (i * 53 + Math.sin(i * 3 + G.t / 90) * 20 + G.t / 6 * ((i % 3) - 1) * 0.3 + i * 17) % W;
+    const sy = (i * 91 + G.t * (0.3 + (i % 5) * 0.12)) % H;
+    ctx.fillRect((sx + W) % W, sy, i % 3 === 0 ? 2 : 1, i % 3 === 0 ? 2 : 1);
+  }
+  ctx.save(); ctx.scale(2, 2);
+  drawTextC("FRIDGE QUEST", 80, 24, "#9fd8f0");
+  ctx.restore();
+  drawTextC("AND THE MYTHICAL PIZZA ROLLS", 160, 66, "#ffe14a");
+  drawSpr(rollSpr, 160 - 15, 92 + Math.sin(G.t / 24) * 4, { scale: 3 });
+  const opts = titleOptions();
+  opts.forEach((o, i) => {
+    const y = 150 + i * 14;
+    drawTextC(o, 160, y, G.titleSel === i ? "#ffe14a" : "#8a93a8");
+    if (G.titleSel === i) ctx.drawImage(soulSpr, 160 - textW(o) / 2 - 12, y);
+  });
+  drawTextC("Z SELECT - ARROWS MOVE - X RUN - C MENU - M MUTE", 160, 210, "#4a5068");
+  drawTextC("A COLD TALE OF WARM FRIENDS", 160, 224, "#3a4058");
+  if (G.flags.gotRolls) drawTextC("* QUEST COMPLETE *", 160, 132, "#58c858");
+}
+
+// ================= ENDING =================
+function updateEnd(){
+  G.endTimer++;
+  if (G.endTimer > 90 && pressed.z){ eat("z"); SFX.confirm(); gotoTitle(); }
+}
+function drawEnd(){
+  ctx.fillStyle = "#08060c"; ctx.fillRect(0, 0, W, H);
+  // pizza roll rain
+  for (let i = 0; i < 12; i++){
+    const sx = (i * 97) % W;
+    const sy = (i * 61 + G.endTimer * (0.4 + (i % 4) * 0.2)) % (H + 20) - 10;
+    drawSpr(rollSpr, sx, sy, { scale: 1, alpha: 0.5 });
+  }
+  ctx.save(); ctx.scale(2, 2);
+  drawTextC("THE END", 80, 22, "#ffe14a");
+  ctx.restore();
+  drawTextC("THE MYTHICAL PIZZA ROLLS WERE REAL.", 160, 70, "#c9c9d8");
+  drawTextC("THE REAL TREASURE WAS ALSO THE PIZZA ROLLS.", 160, 82, "#c9c9d8");
+  drawTextC(`SNACKS BEFRIENDED: ${G.spares}`, 160, 110, "#58c858");
+  drawTextC(`SNACKS DEFEATED: ${G.kills}`, 160, 122, "#e05858");
+  if (G.kills === 0) drawTextC("CLEANEST HANDS IN THE CRISPER!", 160, 134, "#ffe14a");
+  else if (G.spares === 0) drawTextC("THE FRIDGE REMEMBERS.", 160, 134, "#8a93a8");
+  drawTextC(`FINAL LV ${G.lv} - CRUMBS ${G.crumbs}`, 160, 150, "#8a93a8");
+  drawTextC("STARRING: DORKO, MEGAFIRE, BMO,", 160, 172, "#5a6078");
+  drawTextC("KONGY GORGONZOLA, AND A VERY OLD DINNER", 160, 182, "#5a6078");
+  if (G.endTimer > 90 && (G.t >> 4) % 2 === 0)
+    drawTextC("PRESS Z", 160, 204, "#ffe14a");
+}
+
+// ================= MAIN LOOP =================
+function step(){
+  G.t++;
+  if (pressed.m){ eat("m"); toggleMute(); }
+  switch (G.mode){
+    case "title": updateTitle(); break;
+    case "world": updateWorld(); break;
+    case "battle": if (B) updateBattle(); break;
+    case "gameover": if (GO) updateGameOver(); break;
+    case "end": updateEnd(); break;
+  }
+  if (G.mode !== "battle" && G.shake > 0) G.shake--;
+  clearPressed();
+}
+function render(){
+  ctx.fillStyle = "#000"; ctx.fillRect(0, 0, W, H);
+  switch (G.mode){
+    case "title": drawTitle(); break;
+    case "world": drawWorld(); break;
+    case "battle": if (B) drawBattle(); break;
+    case "gameover": if (GO) drawGameOver(); break;
+    case "end": drawEnd(); break;
+  }
+  sctx.imageSmoothingEnabled = false;
+  sctx.drawImage(vc, 0, 0, W * SCALE, H * SCALE);
+}
+let lastT = performance.now(), acc = 0;
+function frame(now){
+  requestAnimationFrame(frame);
+  acc += now - lastT; lastT = now;
+  if (acc > 120) acc = 120;
+  while (acc >= 16.667){ step(); acc -= 16.667; }
+  render();
+}
+gotoTitle();
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
