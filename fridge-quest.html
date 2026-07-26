@@ -1084,16 +1084,16 @@ const ITEM_REACTIONS = {
   dorko: [
     "CRUNCHY. FINE. BACK TO THE ROLLS.",
     "MM. THAT HAPPENED. EAST, EVERYONE.",
-    "THE {ITEM} WAS ACCEPTABLE. THE ROLLS REMAIN THE MISSION."
+    "GOOD {ITEM}. OKAY. ROLLS."
   ],
   mega: [
     "THE {ITEM}... IT TASTES LIKE HOPE. I'D FORGOTTEN HOPE.",
-    "I FELT WARMTH FOR A SECOND. PLEASE DON'T TAKE THIS MOMENT FROM ME.",
-    "EVERY BITE IS A TINY VICTORY AGAINST THE COLD. AND STILL I SHIVER."
+    "I FELT WARMTH FOR A SECOND. PLEASE DON'T TAKE THIS FROM ME.",
+    "OKAY. OKAY. I CAN KEEP GOING. THE {ITEM} BELIEVES IN ME."
   ],
   bmo: [
     "HP RESTORED. CLUTCH HEAL.",
-    "SNACK CONSUMED. INVENTORY OPTIMIZED. NICE.",
+    "MMM. FIVE STARS. WOULD INVENTORY AGAIN.",
     "THE {ITEM} GOES STRAIGHT INTO THE BUILD. FEELING TANKY."
   ]
 };
@@ -1987,6 +1987,8 @@ function enterRoom(id, x, y, instant){
   for (const k in spawnState) delete spawnState[k];
   if (id === "freezer") resetPuzzle();
   const r = ROOMS[id];
+  G.cam.x = r.w < W ? (r.w - W) / 2 : clamp(x - W / 2, 0, r.w - W);
+  G.cam.y = r.h < H ? (r.h - H) / 2 : clamp(y - H / 2, 0, r.h - H);
   playMusic(r.music);
   if (instant){ G.fade.a = 1; G.fade.dir = -1; G.fade.cb = null; }
 }
@@ -2043,6 +2045,9 @@ function updateSpawn(sp){
 function updateWorld(){
   const room = ROOMS[G.roomId];
   updateFade();
+  // if the fade callback just switched rooms, everything below would run against
+  // the OLD room's walls/clamps with the NEW spawn position — resume next frame
+  if (ROOMS[G.roomId] !== room) return;
   if (G.fade.dir !== 0 && G.fade.cb) return;
   if (G.invuln > 0) G.invuln--;
 
@@ -2530,10 +2535,10 @@ function startBattle(groupId, flag){
   if (B.tutorial && !G.flags.tutSeen){
     G.flags.tutSeen = 1;
     say([
-      { p:"bmo", name:"BMO", t:"OKAY, TUTORIAL TIME! FIGHT IS A TIMING MINIGAME - PRESS Z DEAD CENTER FOR A CRIT!" },
-      { p:"bmo", name:"BMO", t:"OR GO PACIFIST ROUTE: USE ACT TO TALK IT OUT, THEN SPARE WHEN THE NAME GLOWS YELLOW." },
-      { p:"bmo", name:"BMO", t:"THEIR TURN IS A BULLET HELL. MOVE THE HEART! GRAZE CLOSE TO BULLETS FOR TP - RISKY PLAYS FILL THE METER." },
-      { p:"bmo", name:"BMO", t:"DEFEND TANKS FOR THE WHOLE TEAM AT HALF DAMAGE. SOMEBODY HAS TO MAIN SUPPORT. TEAMWORK!" }
+      { p:"bmo", name:"BMO", t:"OKAY, SO. FIGHT IS A TIMING THING - TAP Z WHEN THE BAR HITS THE MIDDLE. DEAD CENTER CRITS." },
+      { p:"bmo", name:"BMO", t:"OR DON'T FIGHT AT ALL! ACT IS JUST TALKING. WHEN THEIR NAME TURNS YELLOW, SPARE THEM. WE CAN LITERALLY JUST BE NICE." },
+      { p:"bmo", name:"BMO", t:"WHEN THEY ATTACK, YOU'RE THE LITTLE HEART. DODGE EVERYTHING. SCRAPING CLOSE TO BULLETS BUILDS TP, IF YOU'RE FEELING BRAVE." },
+      { p:"bmo", name:"BMO", t:"AND DEFEND MEANS YOU TAKE THE HITS SO THE REST OF US DON'T. HALF DAMAGE. VERY HEROIC." }
     ]);
   }
 }
@@ -3355,7 +3360,7 @@ function newGame(){
   say([
     { t:"SOMEWHERE IN A KITCHEN, AT PRECISELY SNACK O'CLOCK..." },
     { p:"dorko", name:"DORKO", t:"PIZZA ROLLS. I CAN FEEL THEM. NOTHING ELSE CURRENTLY MATTERS." },
-    { p:"mega", name:"MEGAFIRE", t:"WE'VE SEARCHED FOR HOURS, DORKO. MY HANDS ARE COLD. MY HEART IS COLDER. THIS QUEST IS EATING ME ALIVE." },
+    { p:"mega", name:"MEGAFIRE", t:"DORKO, IT'S BEEN HOURS. I CAN'T FEEL MY HANDS AND I'M STARTING TO HAVE FEELINGS ABOUT THIS FREEZER. BAD ONES." },
     { p:"bmo", name:"BMO", t:"GUYS. THIS SHELF HAS 'TRAP FLOOR' WRITTEN ALL OVER IT. I'VE CLEARED ENOUGH DUNGEONS TO KNOW A-" },
     { t:"THE SHELF GIVES WAY." }
   ], () => {
@@ -3368,7 +3373,7 @@ function newGame(){
       { p:"bmo", name:"BMO", t:"SOFT LANDING. ZERO FALL DAMAGE. MY HAT TANKED IT LIKE A CHAMP." },
       { t:"YOU HAVE FALLEN INTO THE COLD WORLD... THE SECRET KINGDOM INSIDE THE FRIDGE." },
       { p:"mega", name:"MEGAFIRE", t:"...THE FRIDGE HAS A KINGDOM? HOW LONG HAS IT BEEN DOWN HERE? HOW LONG HAVE WE BEEN UP THERE... EATING ITS PEOPLE?" },
-      { p:"bmo", name:"BMO", t:"QUEST UPDATED: FIND THE MYTHICAL PIZZA ROLLS. MAIN STORY. NO SKIPPING CUTSCENES." },
+      { p:"bmo", name:"BMO", t:"WELL, NEW QUEST: FIND THE PIZZA ROLLS. AND NO, WE CAN'T SKIP THIS CUTSCENE. I ALREADY TRIED." },
       { p:"dorko", name:"DORKO", t:"ROLLS FIRST. QUESTIONS NEVER. EAST." }
     ], () => { G.flags.introDone = 1; saveGame(); });
   });
@@ -3392,8 +3397,8 @@ function bossIntroScript(){
     { p:"glacion", name:"KING GLACION", t:"I AM GLACION. FIRST OF THE FROST. KING OF LEFTOVERS. DUKE OF THE DEEP CHILL." },
     { p:"dorko", name:"DORKO", t:"UH HUH. GREAT SPEECH. WHERE ARE THE ROLLS." },
     { p:"glacion", name:"KING GLACION", t:"THE ROLLS STAY. WARM THINGS ALWAYS LEAVE... SO NOTHING HERE IS ALLOWED TO BE WARM." },
-    { p:"mega", name:"MEGAFIRE", t:"(HE'S HURTING, DORKO. CAN'T YOU HEAR IT? THE FROST IS JUST GRIEF WITH BETTER PR.)" },
-    { p:"bmo", name:"BMO", t:"(BOSS FIGHT INCOMING. STOCK UP ON TP. WE TALK HIM DOWN MID-FIGHT - CLASSIC STRAT.)" },
+    { p:"mega", name:"MEGAFIRE", t:"(DORKO. HE'S NOT EVIL. HE'S JUST SAD, AND COLD, AND HONESTLY KIND OF EXTRA ABOUT IT.)" },
+    { p:"bmo", name:"BMO", t:"(BIG ICE GUY, SAD BACKSTORY. WE CAN TALK HIM DOWN MID-FIGHT. I'VE SEEN IT DONE.)" },
     { p:"glacion", name:"KING GLACION", t:"FACE THE COLD!!" },
     { fn(){ startBattle("boss", null); }, t:"THE AIR ITSELF FREEZES OVER!!" }
   ];
@@ -3403,7 +3408,7 @@ function postBossScript(){
     return [
       { p:"glacion", name:"KING GLACION", t:"...WARM. I HAD FORGOTTEN WARM. TAKE THE ROLLS, LITTLE ONES. THEY WERE NEVER MINE TO KEEP." },
       { p:"dorko", name:"DORKO", t:"GOOD TALK. ROLLS NOW." },
-      { p:"mega", name:"MEGAFIRE", t:"(HE MEANS THANK YOU. COME VISIT THE CRISPER, YOUR MAJESTY. THERE'S A BAKERY. PLEASE, PLEASE HEAL.)" },
+      { p:"mega", name:"MEGAFIRE", t:"(HE MEANS THANK YOU. COME BY THE VILLAGE SOMETIME, YOUR MAJESTY. THE BREAD'S WARM.)" },
       { p:"glacion", name:"KING GLACION", t:"A... BAKERY. YES. I WOULD LIKE THAT VERY MUCH." },
       { t:"THE SHRINE ON THE DAIS BEGINS TO GLOW." }
     ];
@@ -3430,7 +3435,7 @@ function endingScript(){
   if (route === "pacifist"){
     script.push(
       { t:"NOBODY GOT HURT DOWN HERE. SOMEHOW, THE ROLLS TASTE WARMER FOR IT." },
-      { p:"bmo", name:"BMO", t:"TRUE PACIFIST CLEAR. HUNDRED PERCENT FRIENDSHIP. LEGENDARY RUN, TEAM." }
+      { p:"bmo", name:"BMO", t:"ZERO DAMAGE DEALT, ALL FRIENDS MADE. BEST RUN OF MY LIFE, AND I ONCE SPEEDRAN BREAKFAST." }
     );
   } else if (route === "violent"){
     script.push(
@@ -3456,8 +3461,8 @@ function homecomingScript(){
   return [
     { t:"POP! THE FRIDGE DOOR SWINGS OPEN AND THREE HEROES TUMBLE OUT INTO THE KITCHEN." },
     { p:"dorko", name:"DORKO", t:"HOME. ROLLS ACQUIRED. MISSION NINETY-NINE PERCENT COMPLETE." },
-    { p:"mega", name:"MEGAFIRE", t:"REAL LIGHT. WARM FLOOR TILES. I COULD KISS THIS LINOLEUM. I WON'T. BUT I COULD." },
-    { p:"bmo", name:"BMO", t:"EPILOGUE MODE UNLOCKED! FREE ROAM! CHECK OUT OUR ROOMS, WATCH SOME TV, WHATEVER YOU WANT." },
+    { p:"mega", name:"MEGAFIRE", t:"REAL SUNLIGHT. WARM TILES. I'M NOT CRYING, THE FRIDGE JUST FOLLOWED ME OUT." },
+    { p:"bmo", name:"BMO", t:"SO THAT'S BASICALLY THE CREDITS... ALMOST. GO POKE AROUND THE HOUSE IF YOU WANT. OUR ROOMS ARE OFF THE LIVING ROOM." },
     { p:"bmo", name:"BMO", t:"AND WHEN YOU'RE READY TO END THE ADVENTURE FOR REAL... THE PIZZA-MOBILE IS WAITING IN THE GARAGE." },
     { p:"dorko", name:"DORKO", t:"ONE LAST RIDE. NO RUSH." }
   ];
@@ -3465,7 +3470,7 @@ function homecomingScript(){
 function fridgeScript(){
   return [{ t:"THE COLD WORLD HUMS SOFTLY BEHIND THE FRIDGE DOOR.", choices:[
     { t:"GO BACK IN", fn(){
-        say([{ p:"mega", name:"MEGAFIRE", t:"AGAIN? ...FINE. FOR THE FRIENDS WE MADE. AND THE ONES WE HAVEN'T MET." }],
+        say([{ p:"mega", name:"MEGAFIRE", t:"AGAIN?! WE JUST-- ...FINE. FINE. LET ME GET MY SCARF." }],
           () => transitionTo("village", 280, 205));
       } },
     { t:"STAY HOME", fn(){
