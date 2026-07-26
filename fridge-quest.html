@@ -300,6 +300,18 @@ const SONGS = {
     ],
     noise: ". . . . h . . . . . . . h . . . . . . . h . . . . . . . h . . ."
   },
+  // Home — cozy, slow, safe
+  home: {
+    bpm: 92, tracks: [
+      { wave: "square", vol: 0.08, seq:
+        "E4 ~  G4 ~  C5 ~  B4 G4 A4 ~  F4 ~  G4 ~  ~  ~  E4 ~  G4 ~  C5 ~  D5 E5 D5 ~  B4 G4 C5 ~  ~  ~  .  ." },
+      { wave: "triangle", vol: 0.10, seq:
+        ".  .  .  C4 .  .  .  E4 .  .  .  C4 .  .  D4 .  .  .  .  C4 .  .  .  F4 .  .  .  D4 .  E4 .  ." },
+      { wave: "triangle", vol: 0.22, seq:
+        "C3 ~  ~  ~  G2 ~  ~  ~  F2 ~  ~  ~  G2 ~  ~  ~  C3 ~  ~  ~  A2 ~  ~  ~  F2 ~  G2 ~  C3 ~  ~  ~" },
+    ],
+    noise: ". . h . . . h . . . h . . . h . . . h . . . h . . . h . . . h ."
+  },
   // Shelf Pass — curious tiptoe march, G major
   shelf: {
     bpm: 118, tracks: [
@@ -439,16 +451,33 @@ function playJingle(kind){
 "use strict";
 // ================= SPRITES: procedural pixel art =================
 // Build a canvas from ASCII rows + palette. Unknown/'.'/' ' chars = transparent.
-function S(rows, pal){
+// Sprites get an automatic 1px dark outline (Deltarune-style) unless outline is null.
+function S(rows, pal, outline = "#12121c"){
   const h = rows.length, w = Math.max(...rows.map(r => r.length));
-  const c = document.createElement("canvas"); c.width = w; c.height = h;
+  const c = document.createElement("canvas"); c.width = w + 2; c.height = h + 2;
   const g = c.getContext("2d");
+  const occ = new Set();
   for (let y = 0; y < h; y++)
     for (let x = 0; x < rows[y].length; x++){
       const col = pal[rows[y][x]];
-      if (col){ g.fillStyle = col; g.fillRect(x, y, 1, 1); }
+      if (col){ g.fillStyle = col; g.fillRect(x + 1, y + 1, 1, 1); occ.add((x + 1) * 1000 + y + 1); }
     }
+  if (outline){
+    g.fillStyle = outline;
+    const edge = new Set();
+    for (const k of occ){
+      const x = Math.floor(k / 1000), y = k % 1000;
+      for (const [ox, oy] of [[1,0],[-1,0],[0,1],[0,-1]])
+        if (!occ.has((x + ox) * 1000 + y + oy)) edge.add((x + ox) * 1000 + y + oy);
+    }
+    for (const k of edge) g.fillRect(Math.floor(k / 1000), k % 1000, 1, 1);
+  }
   return c;
+}
+// soft drop shadow under overworld characters
+function shadow(x, y, w){
+  ctx.fillStyle = "rgba(6,8,18,0.28)";
+  ctx.beginPath(); ctx.ellipse(x, y + 3, w, 3, 0, 0, 7); ctx.fill();
 }
 function drawSpr(cv, x, y, o = {}){
   const sc = o.scale || 1;
@@ -797,7 +826,7 @@ const saveSpr1 = S([
 "..y.w.y..",
 "....y....",
 "....y....",
-], { y:"#ffe14a", w:"#fff8d0", "*":"#ffffff" });
+], { y:"#ffe14a", w:"#fff8d0", "*":"#ffffff" }, null);
 const saveSpr2 = S([
 ".........",
 "....y....",
@@ -808,7 +837,24 @@ const saveSpr2 = S([
 "...ywy...",
 "....y....",
 ".........",
-], { y:"#ffe14a", w:"#fff8d0" });
+], { y:"#ffe14a", w:"#fff8d0" }, null);
+// pushable ice cube for the freezer puzzle
+const iceBlockSpr = S([
+"iiiiiiiiiiiiii",
+"iwwiiiiiiiiiii",
+"iwiiiiiiiiiidi",
+"iiiiiiiiiiiddi",
+"iiiiwiiiiiiidi",
+"iiiwwiiiiiiiii",
+"iiiiiiiiiiiiii",
+"iiiiiiiwiiiiii",
+"iidiiiiwwiiiii",
+"iiddiiiiiiiiii",
+"iiidiiiiiiiiii",
+"iiiiiiiiiiiwwi",
+"idddiiiiiiiiwi",
+"iiiiiiiiiiiiii",
+], { i:"#9fd0f0", w:"#e8f8ff", d:"#6f9fd0" });
 
 // pizza roll + shrine
 const rollSpr = S([
@@ -878,7 +924,7 @@ const soulSpr = S([
 ".rrrrr.",
 "..rrr..",
 "...r...",
-], { r:"#e03050" });
+], { r:"#e03050" }, null);
 
 // ---- portraits (28x28-ish) ----
 const dorkoPort = S([
@@ -1177,21 +1223,27 @@ const ROOMS = {
       { x:306, y:0, w:14, h:96 }, { x:306, y:152, w:14, h:88 }
     ],
     deco(){
-      ctx.fillStyle = "#12141f"; ctx.fillRect(0, 0, 320, 56);
-      ctx.fillStyle = "#262b42";
-      for (let x = 0; x < 320; x += 32) ctx.fillRect(x, 48, 16, 8);
+      diamondFloor(320, 240, "#242a44", 18);
+      wallFace(0, 0, 320, 56, "#12141f", "#2a3050");
       // giant jars in the gloom
       jar(30, 8, "#3a4260"); jar(90, 4, "#333a55"); jar(210, 6, "#3a4260"); jar(268, 10, "#333a55");
-      ctx.fillStyle = "#232841";
-      for (let x = 16; x < 306; x += 24) for (let y = 64; y < 224; y += 24)
-        if ((x + y) % 48 === 16) ctx.fillRect(x, y, 12, 12);
       // hole in ceiling they fell through
       ctx.fillStyle = "#05060a"; ctx.fillRect(52, 12, 40, 26);
       ctx.fillStyle = "#0b0d16"; ctx.fillRect(56, 30, 32, 8);
+      if (G.flags.wentHome){ // sausage-link rope home
+        ctx.fillStyle = "#b06a52";
+        for (let y = 14; y < 60; y += 8) ctx.fillRect(70, y, 4, 6);
+      }
     },
     npcs: [
       { id:"sign1", x:120, y:100, spr:null, w:16, h:12, sign:true, name:"",
-        dlg(){ return [{ t:"WELCOME TO THE COLD WORLD. MIND THE GAP. MIND THE MOLD. MIND YOUR MANNERS." }]; } }
+        dlg(){ return [{ t:"WELCOME TO THE COLD WORLD. MIND THE GAP. MIND THE MOLD. MIND YOUR MANNERS." }]; } },
+      { id:"ropeup", x:72, y:66, spr:null, w:16, h:12, sign:true, noDraw:true, needFlag:"wentHome",
+        dlg(){ return [{ t:"A ROPE OF LINKED SAUSAGES DANGLES FROM THE HOLE ABOVE. CLIMB BACK TO THE KITCHEN?",
+          choices:[
+            { t:"CLIMB", fn(){ transitionTo("kitchen", 66, 128); } },
+            { t:"NOT YET", fn(){} }
+          ] }]; } }
     ],
     saves: [], exits: [ { x:312, y:96, w:8, h:56, to:"village", tx:24, ty:150, dir:"right" } ],
     spawns: [
@@ -1213,10 +1265,13 @@ const ROOMS = {
       { x:370, y:216, w:44, h:26 }  // crate
     ],
     deco(){
-      ctx.fillStyle = "#2c4226"; ctx.fillRect(0, 0, 560, 70);
-      ctx.fillStyle = "#54754a";
-      for (let x = 0; x < 560; x += 20) for (let y = 76; y < 286; y += 20)
-        if ((x + y) % 40 === 16) ctx.fillRect(x + 4, y + 4, 10, 10);
+      checkerFloor(560, 286, "#476340", 20, 70);
+      wallFace(0, 0, 560, 70, "#2c4226", "#3e5836");
+      // flower tufts
+      ctx.fillStyle = "#8ecf5e";
+      [[46,240],[250,254],[330,192],[532,246],[38,184],[210,240]].forEach(([x,y]) => {
+        ctx.fillRect(x, y, 3, 3); ctx.fillRect(x + 5, y + 2, 3, 3); ctx.fillRect(x + 2, y + 5, 3, 3);
+      });
       // path
       ctx.fillStyle = "#8a7a54"; ctx.fillRect(0, 132, 560, 40);
       ctx.fillStyle = "#9c8c64";
@@ -1383,12 +1438,8 @@ const ROOMS = {
       { x:200, y:52, w:26, h:60 }, { x:420, y:118, w:26, h:68 }
     ],
     deco(){
-      ctx.fillStyle = "#332f26"; ctx.fillRect(0, 0, 640, 52);
-      ctx.fillStyle = "#5c5443";
-      for (let x = 0; x < 640; x += 24) ctx.fillRect(x, 44, 12, 8);
-      ctx.fillStyle = "#403a2e";
-      for (let x = 0; x < 640; x += 28) for (let y = 60; y < 186; y += 28)
-        if ((x + y) % 56 === 32) ctx.fillRect(x, y, 14, 14);
+      plankFloor(640, 186, "#3e3a2e", 20, 56);
+      wallFace(0, 0, 640, 52, "#332f26", "#4a4436");
       jar(60, 6, "#5f5a8c"); jar(300, 2, "#8c5a5a"); jar(540, 6, "#5a8c6a");
       // fallen jars as obstacles
       ctx.fillStyle = "#6a628c"; ctx.fillRect(200, 60, 26, 52);
@@ -1433,12 +1484,9 @@ const ROOMS = {
       { x:392, y:188, w:26, h:98 }    // gate bottom (kongy stands in gap)
     ],
     deco(){
-      ctx.fillStyle = "#141a30"; ctx.fillRect(0, 0, 560, 64);
-      ctx.fillStyle = "#2c3a63";
-      for (let x = 0; x < 560; x += 26) ctx.fillRect(x, 56, 13, 8);
-      ctx.fillStyle = "#26335a";
-      for (let x = 0; x < 560; x += 30) for (let y = 70; y < 286; y += 30)
-        if ((x + y) % 60 === 10) ctx.fillRect(x, y, 15, 15);
+      diamondFloor(560, 300, "#28335c", 18);
+      wallFace(0, 0, 560, 64, "#141a30", "#26335a");
+      drawPuzzle();
       // frost piles
       ctx.fillStyle = "#7f9fd0";
       [[40,90],[120,250],[330,240],[480,90],[200,200]].forEach(([x,y]) => {
@@ -1451,6 +1499,8 @@ const ROOMS = {
     npcs: [
       { id:"sign3", x:60, y:110, spr:null, w:16, h:12, sign:true,
         dlg(){ return [{ t:"THE FREEZER KING SEES ALL. HE ALSO CRIES A LOT. THE TEARS BECOME ICICLES. IT'S A PROBLEM." }]; } },
+      { id:"sign4", x:452, y:104, spr:null, w:16, h:12, sign:true,
+        dlg(){ return [{ t:"TWO COLD FEET ON TWO WARM SPOTS. THE ICE DOOR IS LISTENING." }]; } },
       { id:"kongy", x:404, y:164, spr:kongySpr, w:22, h:48, solid:true, name:"KONGY",
         hideFlag:"kongyDone", dlg(){ return kongyScript(); } },
       { id:"kongy2", x:350, y:248, spr:kongySpr, w:18, h:14, solid:true, name:"KONGY",
@@ -1481,12 +1531,11 @@ const ROOMS = {
       { x:310, y:0, w:10, h:240 }
     ],
     deco(){
-      ctx.fillStyle = "#10152b"; ctx.fillRect(0, 0, 320, 70);
-      ctx.fillStyle = "#232d52";
-      for (let x = 0; x < 320; x += 22) ctx.fillRect(x, 62, 11, 8);
-      ctx.fillStyle = "#202a4e";
-      for (let x = 0; x < 320; x += 26) for (let y = 76; y < 226; y += 26)
-        if ((x + y) % 52 === 24) ctx.fillRect(x, y, 13, 13);
+      diamondFloor(320, 240, "#202a4e", 18);
+      wallFace(0, 0, 320, 70, "#10152b", "#232d52");
+      // royal runner carpet
+      ctx.fillStyle = "#3a2f5e"; ctx.fillRect(140, 70, 40, 156);
+      ctx.fillStyle = "#4c3f7a"; ctx.fillRect(146, 70, 28, 156);
       // throne dais
       ctx.fillStyle = "#2e3c6e"; ctx.fillRect(120, 70, 80, 30);
       ctx.fillStyle = "#3c4f8e"; ctx.fillRect(130, 74, 60, 22);
@@ -1511,6 +1560,36 @@ const ROOMS = {
   }
 };
 // deco helpers
+function checkerFloor(w, h, col, s = 18, y0 = 0){
+  ctx.fillStyle = col;
+  for (let y = y0; y < h; y += s)
+    for (let x = (((y - y0) / s) % 2) * s; x < w; x += s * 2)
+      ctx.fillRect(x, y, s, s);
+}
+function diamondFloor(w, h, col, s = 16){
+  ctx.fillStyle = col;
+  const hs = Math.floor(s * 0.32);
+  for (let y = 0; y <= h + s; y += s)
+    for (let x = ((y / s) % 2) * s * 0.5 * 2; x <= w + s; x += s * 2){
+      ctx.beginPath();
+      ctx.moveTo(x, y - hs); ctx.lineTo(x + hs, y); ctx.lineTo(x, y + hs); ctx.lineTo(x - hs, y);
+      ctx.fill();
+    }
+}
+function plankFloor(w, h, line, s = 18, y0 = 0){
+  ctx.fillStyle = line;
+  for (let y = y0; y < h; y += s){
+    ctx.fillRect(0, y, w, 2);
+    for (let x = ((y / s) % 3) * 40 + 14; x < w; x += 110) ctx.fillRect(x, y + 2, 2, s - 2);
+  }
+}
+function wallFace(x, y, w, h, top, face){
+  ctx.fillStyle = top; ctx.fillRect(x, y, w, h - 12);
+  ctx.fillStyle = face; ctx.fillRect(x, y + h - 12, w, 12);
+  ctx.fillStyle = "rgba(0,0,0,0.25)"; ctx.fillRect(x, y + h - 3, w, 3);
+  ctx.fillStyle = "rgba(255,255,255,0.06)";
+  for (let px = x + 6; px < x + w; px += 26) ctx.fillRect(px, y + h - 12, 2, 9);
+}
 function jar(x, y, col){
   ctx.fillStyle = col; ctx.fillRect(x, y + 10, 36, 34);
   ctx.fillRect(x + 4, y + 4, 28, 8);
@@ -1563,6 +1642,341 @@ function icePillar(x, y, w, h){
   ctx.fillStyle = "#3a5488"; ctx.fillRect(x + w - 6, y + 4, 4, h - 8);
 }
 
+// ---------------- freezer ice-block puzzle ----------------
+const ICE_BARRIER = { x:536, y:120, w:16, h:56 };
+const PUZZLE_BLOCK_STARTS = [[500, 140], [450, 240]];
+const PUZZLE_PLATES = [[450, 140], [510, 240]];
+let puzzleBlocks = [];
+function blockRect(b){ return { x: b.x - 8, y: b.y - 8, w: 16, h: 16 }; }
+function resetPuzzle(){
+  puzzleBlocks = G.flags.icePuzzle
+    ? PUZZLE_PLATES.map(([x, y]) => ({ x, y, locked: true }))
+    : PUZZLE_BLOCK_STARTS.map(([x, y]) => ({ x, y, locked: false }));
+}
+function tryPushBlock(sx, sy, nb){
+  if (G.roomId !== "freezer") return;
+  const b = puzzleBlocks.find(bl => !bl.locked && overlaps(nb, blockRect(bl)));
+  if (!b) return;
+  const room = ROOMS.freezer, step = 0.8;
+  const nr = { x: b.x - 8 + sx * step, y: b.y - 8 + sy * step, w: 16, h: 16 };
+  for (const wl of room.walls) if (overlaps(nr, wl)) return;
+  if (!G.flags.icePuzzle && overlaps(nr, ICE_BARRIER)) return;
+  for (const ob of puzzleBlocks) if (ob !== b && overlaps(nr, blockRect(ob))) return;
+  for (const n of room.npcs){
+    if (n.needFlag && !G.flags[n.needFlag]) continue;
+    if (n.hideFlag && G.flags[n.hideFlag]) continue;
+    if (n.solid && overlaps(nr, { x: n.x - n.w / 2, y: n.y - n.h / 2, w: n.w, h: n.h })) return;
+  }
+  if (nr.x < 12 || nr.y < 12 || nr.x + 16 > room.w - 12 || nr.y + 16 > room.h - 12) return;
+  b.x += sx * step; b.y += sy * step;
+  const nb2 = feetBox(player.x + sx * step, player.y + sy * step);
+  if (!collides(nb2, room)){ player.x += sx * step; player.y += sy * step; }
+  if (G.t % 9 === 0) SFX.blip2();
+  for (const [px2, py2] of PUZZLE_PLATES){
+    if (puzzleBlocks.some(ob => ob.locked && ob.x === px2 && ob.y === py2)) continue;
+    if (Math.abs(b.x - px2) < 5 && Math.abs(b.y - py2) < 5){
+      b.x = px2; b.y = py2; b.locked = true;
+      SFX.confirm(); shake(2, 6);
+      if (puzzleBlocks.every(bl => bl.locked) && !G.flags.icePuzzle){
+        G.flags.icePuzzle = 1;
+        SFX.heal(); shake(3, 12);
+        say([{ t:"THE WARM SPOTS HUM IN HARMONY. ACROSS THE ROOM, THE ICE DOOR SIGHS... AND MELTS INTO STEAM." }]);
+      }
+      break;
+    }
+  }
+}
+function drawPuzzle(){
+  for (const [px2, py2] of PUZZLE_PLATES){
+    const occupied = puzzleBlocks.some(b => b.locked && b.x === px2 && b.y === py2);
+    ctx.globalAlpha = occupied ? 0.95 : 0.55 + 0.25 * Math.sin(G.t / 14);
+    ctx.fillStyle = "#e08a30"; ctx.fillRect(px2 - 9, py2 - 9, 18, 18);
+    ctx.fillStyle = "#ffc86a"; ctx.fillRect(px2 - 6, py2 - 6, 12, 12);
+    ctx.globalAlpha = 1;
+  }
+  if (!G.flags.icePuzzle){
+    icePillar(536, 92, 16, 86);
+    ctx.fillStyle = `rgba(255,255,255,${0.22 + 0.14 * Math.sin(G.t / 10)})`;
+    ctx.fillRect(538, 122, 4, 52);
+  }
+}
+
+// ---------------- the house (post-fridge epilogue world) ----------------
+Object.assign(ROOMS, {
+  kitchen: {
+    w: 320, h: 240, music: "home", dark: false,
+    floor: "#d8c9a8",
+    walls: [
+      { x:0, y:0, w:320, h:70 }, { x:0, y:226, w:320, h:14 },
+      { x:0, y:0, w:14, h:240 },
+      { x:306, y:0, w:14, h:120 }, { x:306, y:176, w:14, h:64 },
+      { x:24, y:36, w:44, h:66 },
+      { x:80, y:70, w:226, h:28 },
+      { x:150, y:150, w:60, h:34 }
+    ],
+    deco(){
+      checkerFloor(320, 226, "#c8b896", 20, 70);
+      wallFace(0, 0, 320, 70, "#b0987c", "#c9b394");
+      // window
+      ctx.fillStyle = "#7ab0d8"; ctx.fillRect(196, 14, 44, 34);
+      ctx.fillStyle = "#f5e8c0"; ctx.fillRect(214, 14, 4, 34); ctx.fillRect(196, 28, 44, 4);
+      // the fridge (door to the cold world)
+      ctx.fillStyle = "#d8dce0"; ctx.fillRect(24, 30, 44, 72);
+      ctx.fillStyle = "#b8bcc4"; ctx.fillRect(24, 54, 44, 3);
+      ctx.fillStyle = "#8a8e96"; ctx.fillRect(62, 38, 4, 12); ctx.fillRect(62, 62, 4, 20);
+      ctx.fillStyle = "#e05858"; ctx.fillRect(32, 40, 5, 5);
+      ctx.fillStyle = "#58a0e0"; ctx.fillRect(42, 44, 5, 5);
+      ctx.fillStyle = "#58c858"; ctx.fillRect(36, 66, 5, 5);
+      ctx.fillStyle = "#ffe14a"; ctx.fillRect(48, 70, 5, 5);
+      // counters, sink, stove
+      ctx.fillStyle = "#a8825c"; ctx.fillRect(80, 70, 226, 28);
+      ctx.fillStyle = "#c99e6e"; ctx.fillRect(80, 70, 226, 8);
+      ctx.fillStyle = "#8a93a8"; ctx.fillRect(120, 74, 30, 16);
+      ctx.fillStyle = "#3a3f52"; ctx.fillRect(220, 72, 44, 22);
+      ctx.fillStyle = "#14141c";
+      ctx.beginPath(); ctx.arc(232, 82, 5, 0, 7); ctx.arc(252, 82, 5, 0, 7); ctx.fill();
+      // table + chairs
+      ctx.fillStyle = "#a8825c"; ctx.fillRect(150, 150, 60, 34);
+      ctx.fillStyle = "#c99e6e"; ctx.fillRect(154, 154, 52, 26);
+      ctx.fillStyle = "#8a6a3c"; ctx.fillRect(132, 158, 12, 18); ctx.fillRect(216, 158, 12, 18);
+    },
+    npcs: [
+      { id:"homefridge", x:46, y:106, spr:null, w:16, h:12, sign:true, noDraw:true,
+        dlg(){ return fridgeScript(); } }
+    ],
+    saves: [ { x:260, y:200 } ],
+    exits: [ { x:312, y:120, w:8, h:56, to:"living", tx:26, ty:150, dir:"right" } ],
+    spawns: []
+  },
+  living: {
+    w: 360, h: 240, music: "home", dark: false,
+    floor: "#c9a878",
+    walls: [
+      { x:0, y:0, w:360, h:70 }, { x:0, y:226, w:360, h:14 },
+      { x:0, y:0, w:14, h:120 }, { x:0, y:176, w:14, h:64 },
+      { x:346, y:0, w:14, h:120 }, { x:346, y:176, w:14, h:64 },
+      { x:206, y:70, w:60, h:22 },
+      { x:120, y:150, w:80, h:24 }
+    ],
+    deco(){
+      plankFloor(360, 226, "#a8885c", 20, 70);
+      wallFace(0, 0, 360, 70, "#9c8468", "#b09878");
+      // bedroom doors with per-hero marks
+      [[40, "#35b04a"], [150, "#5ea8e8"], [288, "#8a4ad8"]].forEach(([dx, col]) => {
+        ctx.fillStyle = "#7a5a38"; ctx.fillRect(dx, 22, 20, 44);
+        ctx.fillStyle = "#8f6c46"; ctx.fillRect(dx + 2, 24, 16, 42);
+        ctx.fillStyle = "#ffe14a"; ctx.fillRect(dx + 14, 44, 3, 3);
+        ctx.fillStyle = col; ctx.fillRect(dx + 6, 28, 8, 6);
+      });
+      // TV on stand, consoles below
+      ctx.fillStyle = "#5c4a2e"; ctx.fillRect(206, 70, 60, 22);
+      ctx.fillStyle = "#14141c"; ctx.fillRect(204, 26, 64, 44);
+      ctx.fillStyle = "#2a3a52"; ctx.fillRect(208, 30, 56, 36);
+      drawSpr(rollSpr, 224, 42, {});
+      ctx.fillStyle = "#e8e8f0"; ctx.fillRect(252, 60, 8, 3);
+      ctx.fillStyle = "#3a3f52"; ctx.fillRect(196, 96, 14, 8); ctx.fillRect(216, 96, 14, 8);
+      ctx.fillStyle = "#6fd8c0"; ctx.fillRect(236, 96, 14, 8);
+      ctx.fillStyle = "#14141c";
+      ctx.fillRect(202, 104, 2, 8); ctx.fillRect(222, 104, 2, 8); ctx.fillRect(242, 104, 2, 8);
+      // couch + rug
+      ctx.fillStyle = "#a85a5a"; ctx.fillRect(120, 144, 80, 30);
+      ctx.fillStyle = "#c87878"; ctx.fillRect(124, 148, 34, 16); ctx.fillRect(162, 148, 34, 16);
+      ctx.fillStyle = "#8a4a4a"; ctx.fillRect(120, 144, 6, 30); ctx.fillRect(194, 144, 6, 30);
+      ctx.fillStyle = "rgba(90,110,160,0.25)"; ctx.fillRect(60, 108, 100, 30);
+    },
+    npcs: [
+      { id:"tv", x:236, y:96, spr:null, w:16, h:12, sign:true, noDraw:true,
+        dlg(){ return [
+          { t:"THE TV IS PAUSED ON A COOKING SHOW. IT'S PIZZA ROLLS. IT HAS ALWAYS BEEN PIZZA ROLLS." },
+          { p:"mega", name:"MEGAFIRE", t:"I'VE SEEN THIS EPISODE. I CRY AT THE OVEN REVEAL. EVERY TIME." }
+        ]; } },
+      { id:"consoles", x:223, y:112, spr:null, w:16, h:10, sign:true, noDraw:true,
+        dlg(){ return [{ p:"bmo", name:"BMO", t:"MY CONSOLES! MY SAVES! HELLO, BEAUTIFUL BACKLOG. I DIDN'T FORGET YOU. I WOULD NEVER." }]; } },
+      { id:"couch", x:160, y:180, spr:null, w:16, h:10, sign:true, noDraw:true,
+        dlg(){ return [{ p:"dorko", name:"DORKO", t:"THE COUCH. SCENE OF MY GREATEST NAPS. WE RIDE AT DUSK. AFTER A NAP." }]; } }
+    ],
+    saves: [],
+    exits: [
+      { x:0, y:120, w:8, h:56, to:"kitchen", tx:290, ty:150, dir:"left" },
+      { x:352, y:120, w:8, h:56, to:"garage", tx:26, ty:110, dir:"right" },
+      { x:40, y:66, w:20, h:8, to:"dorkoroom", tx:110, ty:140, dir:"up" },
+      { x:150, y:66, w:20, h:8, to:"megaroom", tx:110, ty:140, dir:"up" },
+      { x:288, y:66, w:20, h:8, to:"bmoroom", tx:110, ty:140, dir:"up" }
+    ],
+    spawns: []
+  },
+  dorkoroom: {
+    w: 220, h: 170, music: "home", dark: false,
+    floor: "#b09468",
+    walls: [
+      { x:0, y:0, w:220, h:44 }, { x:0, y:0, w:10, h:170 }, { x:210, y:0, w:10, h:170 },
+      { x:0, y:160, w:90, h:10 }, { x:130, y:160, w:90, h:10 },
+      { x:26, y:50, w:56, h:32 }, { x:150, y:44, w:46, h:22 }
+    ],
+    deco(){
+      plankFloor(220, 160, "#9c8058", 18, 50);
+      wallFace(0, 0, 220, 44, "#4a7a48", "#5c8f56");
+      // legendary roll poster
+      ctx.fillStyle = "#f5e8c0"; ctx.fillRect(98, 6, 40, 30);
+      drawSpr(rollSpr, 112, 12, {});
+      ctx.fillStyle = "#14141c"; ctx.fillRect(104, 28, 26, 2);
+      // shell bed
+      ctx.fillStyle = "#b35c12"; ctx.fillRect(26, 50, 56, 32);
+      ctx.fillStyle = "#f08a24"; ctx.fillRect(30, 54, 48, 24);
+      ctx.fillStyle = "#ffedbe"; ctx.fillRect(30, 54, 48, 6);
+      ctx.fillStyle = "#c96a1f"; ctx.fillRect(40, 62, 10, 12); ctx.fillRect(58, 62, 10, 12);
+      // dresser with 14 identical shades
+      ctx.fillStyle = "#8a6a3c"; ctx.fillRect(150, 44, 46, 22);
+      ctx.fillStyle = "#a8854c"; ctx.fillRect(153, 47, 40, 16);
+      ctx.fillStyle = "#14141c";
+      for (let i = 0; i < 3; i++) ctx.fillRect(158 + i * 12, 52, 8, 3);
+    },
+    npcs: [
+      { id:"bedD", x:54, y:88, spr:null, w:16, h:10, sign:true, noDraw:true,
+        dlg(){ return [{ p:"dorko", name:"DORKO", t:"MY SHELL BED. IT'S NOT A METAPHOR. I JUST LIKE SHELLS." }]; } },
+      { id:"posterD", x:118, y:50, spr:null, w:16, h:10, sign:true, noDraw:true,
+        dlg(){ return [{ t:"A POSTER OF THE LEGENDARY PIZZA ROLL. IT'S SIGNED. NOBODY KNOWS BY WHOM." },
+                       { p:"dorko", name:"DORKO", t:"I KNOW." }]; } },
+      { id:"dresserD", x:172, y:72, spr:null, w:16, h:10, sign:true, noDraw:true,
+        dlg(){ return [{ t:"TRIANGLE SHADES. FOURTEEN IDENTICAL PAIRS, IMMACULATELY ARRANGED." }]; } }
+    ],
+    saves: [],
+    exits: [ { x:92, y:164, w:36, h:6, to:"living", tx:50, ty:83, dir:"down" } ],
+    spawns: []
+  },
+  megaroom: {
+    w: 220, h: 170, music: "home", dark: false,
+    floor: "#8ca0c0",
+    walls: [
+      { x:0, y:0, w:220, h:44 }, { x:0, y:0, w:10, h:170 }, { x:210, y:0, w:10, h:170 },
+      { x:0, y:160, w:90, h:10 }, { x:130, y:160, w:90, h:10 },
+      { x:26, y:50, w:52, h:28 }, { x:140, y:44, w:52, h:22 }, { x:174, y:118, w:24, h:20 }
+    ],
+    deco(){
+      plankFloor(220, 160, "#7a8eac", 18, 50);
+      wallFace(0, 0, 220, 44, "#2e4a78", "#3a5a8e");
+      // ushanka rack
+      ctx.fillStyle = "#7a5a38"; ctx.fillRect(96, 10, 40, 4);
+      ctx.fillStyle = "#3a6fd8"; ctx.fillRect(100, 14, 12, 9); ctx.fillRect(120, 14, 12, 9);
+      ctx.fillStyle = "#25459c"; ctx.fillRect(100, 21, 12, 4); ctx.fillRect(120, 21, 12, 4);
+      // immaculate bed
+      ctx.fillStyle = "#25459c"; ctx.fillRect(26, 50, 52, 28);
+      ctx.fillStyle = "#3a6fd8"; ctx.fillRect(30, 54, 44, 20);
+      ctx.fillStyle = "#e8f0ff"; ctx.fillRect(30, 54, 44, 6);
+      // desk + journal
+      ctx.fillStyle = "#8a6a3c"; ctx.fillRect(140, 44, 52, 22);
+      ctx.fillStyle = "#f2f2ee"; ctx.fillRect(154, 48, 22, 13);
+      ctx.fillStyle = "#8a93a8"; ctx.fillRect(164, 48, 2, 13);
+      // space heater at MAXIMUM
+      ctx.fillStyle = "#3a3f52"; ctx.fillRect(174, 118, 24, 20);
+      const hg = 0.5 + 0.2 * Math.sin(G.t / 30);
+      ctx.globalAlpha = hg; ctx.fillStyle = "#e08a30"; ctx.fillRect(178, 122, 16, 12); ctx.globalAlpha = 1;
+    },
+    npcs: [
+      { id:"bedM", x:52, y:84, spr:null, w:16, h:10, sign:true, noDraw:true,
+        dlg(){ return [{ p:"mega", name:"MEGAFIRE", t:"I MAKE MY BED EVERY MORNING. IT'S THE ONE BATTLE I ALWAYS WIN." }]; } },
+      { id:"journalM", x:166, y:72, spr:null, w:16, h:10, sign:true, noDraw:true,
+        dlg(){ return [{ t:"MEGAFIRE'S JOURNAL. 'DAY 400: STILL COLD. STILL BRAVE.'" },
+                       { p:"mega", name:"MEGAFIRE", t:"...IT'S A GOOD ENTRY." }]; } },
+      { id:"heaterM", x:186, y:144, spr:null, w:16, h:10, sign:true, noDraw:true,
+        dlg(){ return [{ t:"THE SPACE HEATER IS SET TO MAXIMUM. IT HAS ALWAYS BEEN SET TO MAXIMUM." },
+                       { p:"mega", name:"MEGAFIRE", t:"AND YET." }]; } }
+    ],
+    saves: [],
+    exits: [ { x:92, y:164, w:36, h:6, to:"living", tx:160, ty:83, dir:"down" } ],
+    spawns: []
+  },
+  bmoroom: {
+    w: 220, h: 170, music: "home", dark: false,
+    floor: "#8ab0a4",
+    walls: [
+      { x:0, y:0, w:220, h:44 }, { x:0, y:0, w:10, h:170 }, { x:210, y:0, w:10, h:170 },
+      { x:0, y:160, w:90, h:10 }, { x:130, y:160, w:90, h:10 },
+      { x:26, y:44, w:38, h:42 }, { x:140, y:60, w:48, h:20 }
+    ],
+    deco(){
+      plankFloor(220, 160, "#78a094", 18, 50);
+      wallFace(0, 0, 220, 44, "#4a3a78", "#5c4a8e");
+      // high score wall chart
+      ctx.fillStyle = "#f5e8c0"; ctx.fillRect(96, 6, 44, 32);
+      ctx.fillStyle = "#14141c";
+      ctx.fillRect(100, 10, 24, 3); ctx.fillRect(100, 17, 20, 3); ctx.fillRect(100, 24, 26, 3); ctx.fillRect(100, 31, 14, 3);
+      // arcade cabinet
+      ctx.fillStyle = "#2a2438"; ctx.fillRect(26, 40, 38, 46);
+      ctx.fillStyle = "#8a4ad8"; ctx.fillRect(26, 40, 38, 8);
+      ctx.fillStyle = "#6fd8c0"; ctx.fillRect(32, 52, 26, 18);
+      ctx.fillStyle = "#e05858"; ctx.fillRect(34, 74, 6, 6);
+      ctx.fillStyle = "#ffe14a"; ctx.fillRect(46, 74, 6, 6);
+      // charging dock bed
+      ctx.fillStyle = "#3f9e8a"; ctx.fillRect(140, 60, 48, 20);
+      ctx.fillStyle = "#6fd8c0"; ctx.fillRect(144, 64, 40, 12);
+      ctx.fillStyle = "#ffe14a"; ctx.fillRect(160, 66, 4, 8); ctx.fillRect(156, 70, 4, 4);
+      // backup hat stand
+      ctx.fillStyle = "#7a5a38"; ctx.fillRect(178, 116, 4, 26);
+      ctx.fillStyle = "#8a4ad8"; ctx.fillRect(170, 106, 20, 10);
+      ctx.fillStyle = "#5c2e96"; ctx.fillRect(166, 114, 28, 4);
+    },
+    npcs: [
+      { id:"arcadeB", x:45, y:92, spr:null, w:16, h:10, sign:true, noDraw:true,
+        dlg(){ return [{ p:"bmo", name:"BMO", t:"HIGH SCORE: BMO. SECOND: BMO. THIRD: A MOTH THAT GOT IN ONCE. RESPECT, MOTH." }]; } },
+      { id:"dockB", x:163, y:86, spr:null, w:16, h:10, sign:true, noDraw:true,
+        dlg(){ return [{ p:"bmo", name:"BMO", t:"MY CHARGING DOCK. ONE-X SLEEP SPEED, THREE-X DREAM RESOLUTION." }]; } },
+      { id:"hatB", x:180, y:140, spr:null, w:16, h:10, sign:true, noDraw:true,
+        dlg(){ return [{ t:"THE BACKUP WIZARD HAT. FOR WIZARD EMERGENCIES." }]; } }
+    ],
+    saves: [],
+    exits: [ { x:92, y:164, w:36, h:6, to:"living", tx:298, ty:83, dir:"down" } ],
+    spawns: []
+  },
+  garage: {
+    w: 280, h: 200, music: "home", dark: false,
+    floor: "#8a8a92",
+    walls: [
+      { x:0, y:0, w:280, h:56 }, { x:0, y:186, w:280, h:14 },
+      { x:0, y:0, w:14, h:82 }, { x:0, y:138, w:14, h:62 },
+      { x:266, y:0, w:14, h:200 },
+      { x:90, y:86, w:110, h:54 }
+    ],
+    deco(){
+      checkerFloor(280, 186, "#80808a", 22, 56);
+      wallFace(0, 0, 280, 56, "#5a5a64", "#6e6e78");
+      // rolling garage door
+      ctx.fillStyle = "#787882"; ctx.fillRect(190, 6, 70, 42);
+      ctx.fillStyle = "#8e8e98";
+      for (let y = 10; y < 46; y += 8) ctx.fillRect(192, y, 66, 4);
+      // pegboard tools
+      ctx.fillStyle = "#a8825c"; ctx.fillRect(24, 10, 60, 34);
+      ctx.fillStyle = "#5a5f72";
+      ctx.fillRect(30, 16, 4, 16); ctx.fillRect(28, 30, 8, 6);
+      ctx.fillRect(44, 16, 12, 4); ctx.fillRect(48, 20, 4, 12);
+      ctx.fillRect(64, 16, 4, 18); ctx.fillRect(62, 14, 8, 4);
+      // oil stain
+      ctx.fillStyle = "rgba(20,20,28,0.3)";
+      ctx.beginPath(); ctx.ellipse(230, 160, 18, 8, 0, 0, 7); ctx.fill();
+      // THE PIZZA-MOBILE
+      ctx.fillStyle = "#8a3028"; ctx.fillRect(90, 96, 110, 44);
+      ctx.fillStyle = "#c04838"; ctx.fillRect(94, 92, 102, 40);
+      ctx.fillStyle = "#f2ede2"; ctx.fillRect(94, 108, 102, 10);
+      ctx.fillStyle = "#ffe14a";
+      ctx.fillRect(100, 118, 8, 6); ctx.fillRect(120, 118, 8, 9); ctx.fillRect(146, 118, 8, 5); ctx.fillRect(172, 118, 8, 8);
+      ctx.fillStyle = "#9fd8f0"; ctx.fillRect(102, 96, 30, 10);
+      ctx.fillStyle = "#14141c";
+      ctx.beginPath(); ctx.arc(114, 140, 9, 0, 7); ctx.arc(176, 140, 9, 0, 7); ctx.fill();
+      ctx.fillStyle = "#5a5f72";
+      ctx.beginPath(); ctx.arc(114, 140, 4, 0, 7); ctx.arc(176, 140, 4, 0, 7); ctx.fill();
+      ctx.fillStyle = "#ffe14a"; ctx.fillRect(190, 100, 6, 8);
+      drawSpr(rollSpr, 128, 74, { scale: 2 });
+    },
+    npcs: [
+      { id:"mobile", x:145, y:148, spr:null, w:18, h:10, sign:true, noDraw:true,
+        dlg(){ return pizzaMobileScript(); } }
+    ],
+    saves: [],
+    exits: [ { x:0, y:82, w:8, h:56, to:"living", tx:334, ty:150, dir:"left" } ],
+    spawns: []
+  }
+});
+
 // npc talk counters
 const talkCounts = {};
 
@@ -1571,6 +1985,7 @@ function enterRoom(id, x, y, instant){
   G.roomId = id; player.x = x; player.y = y; player.trail = [];
   G.invuln = 60;
   for (const k in spawnState) delete spawnState[k];
+  if (id === "freezer") resetPuzzle();
   const r = ROOMS[id];
   playMusic(r.music);
   if (instant){ G.fade.a = 1; G.fade.dir = -1; G.fade.cb = null; }
@@ -1594,6 +2009,10 @@ function drawFade(){
 function feetBox(x, y){ return { x: x - 5, y: y - 5, w: 10, h: 8 }; }
 function collides(box, room){
   for (const wl of room.walls) if (overlaps(box, wl)) return true;
+  if (G.roomId === "freezer"){
+    if (!G.flags.icePuzzle && overlaps(box, ICE_BARRIER)) return true;
+    for (const b of puzzleBlocks) if (overlaps(box, blockRect(b))) return true;
+  }
   for (const n of room.npcs){
     if (n.needFlag && !G.flags[n.needFlag]) continue;
     if (n.hideFlag && G.flags[n.hideFlag]) continue;
@@ -1644,8 +2063,10 @@ function updateWorld(){
     if (dx < 0) player.dir = "left"; else if (dx > 0) player.dir = "right";
     let nb = feetBox(player.x + dx * spd, player.y);
     if (!collides(nb, room)) player.x += dx * spd;
+    else if (dx) tryPushBlock(Math.sign(dx), 0, nb);
     nb = feetBox(player.x, player.y + dy * spd);
     if (!collides(nb, room)) player.y += dy * spd;
+    else if (dy) tryPushBlock(0, Math.sign(dy), nb);
     player.x = clamp(player.x, 8, room.w - 8);
     player.y = clamp(player.y, 8, room.h - 8);
     player.trail.push({ x: player.x, y: player.y, dir: player.dir });
@@ -1728,8 +2149,9 @@ function drawCharSprite(mem, pos){
   const spr = pos.dir === "up" ? mem.sprB : mem.sprF;
   const flip = pos.dir === "left";
   const yo = bob(G.t, pos.walking);
+  shadow(pos.x, pos.y, 7);
   if (mem.hp <= 0) ctx.globalAlpha = 0.5;
-  drawSpr(spr, pos.x - 8, pos.y - 17 + yo, { flip });
+  drawSpr(spr, pos.x - spr.width / 2, pos.y - spr.height + 3 + yo, { flip });
   ctx.globalAlpha = 1;
 }
 const darkOverlay = document.createElement("canvas");
@@ -1757,6 +2179,7 @@ function drawWorld(){
     } else if (n.spr){
       items.push({ y: n.y, draw(){
         const yo = n.id === "kongy" ? Math.floor(Math.sin(G.t / 20) * 1.5) : 0;
+        shadow(n.x, n.y + 2, n.spr.width * 0.38);
         drawSpr(n.spr, n.x - n.spr.width / 2, n.y - n.spr.height + 5 + yo, {});
       } });
     }
@@ -1771,9 +2194,18 @@ function drawWorld(){
     if (G.flags[sp.flag]) continue;
     const p = spawnPos(sp);
     items.push({ y: p.y, draw(){
+      shadow(p.x, p.y + 2, sp.spr.width * 0.38);
       drawSpr(sp.spr, p.x - sp.spr.width / 2, p.y - sp.spr.height + 5, {});
       if ((G.t >> 3) % 4 === 0){ drawText("!", p.x - 2, p.y - sp.spr.height - 6, "#ff5858"); }
     } });
+  }
+  if (G.roomId === "freezer"){
+    for (const b of puzzleBlocks)
+      items.push({ y: b.y + 6, draw(){
+        shadow(b.x, b.y + 6, 6);
+        drawSpr(iceBlockSpr, b.x - 8, b.y - 10, {});
+        if (b.locked){ ctx.fillStyle = "rgba(255,200,106,0.25)"; ctx.fillRect(b.x - 8, b.y - 8, 16, 16); }
+      } });
   }
   for (let i = 2; i >= 0; i--){
     const pos = partyMember(i), mem = G.party[i];
@@ -2724,9 +3156,16 @@ function drawBattle(){
   grd.addColorStop(0, boss ? "#101a38" : "#181428");
   grd.addColorStop(1, "#060810");
   ctx.fillStyle = grd; ctx.fillRect(0, 0, W, H);
+  // slow-drifting diamond field (Deltarune dark-world flavor)
   ctx.fillStyle = boss ? "#1a2a52" : "#241e3e";
-  for (let x = 0; x < W; x += 32) for (let y = 0; y < 70; y += 32)
-    if ((x + y) % 64 === 0) ctx.fillRect(x + 10, y + 6, 10, 10);
+  const driftX = (G.t * 0.22) % 28, driftY = (G.t * 0.11) % 28;
+  for (let y = -28; y < H + 28; y += 28)
+    for (let x = -28; x < W + 28; x += 28){
+      const px2 = x + driftX, py2 = y + driftY;
+      ctx.beginPath();
+      ctx.moveTo(px2, py2 - 5); ctx.lineTo(px2 + 5, py2); ctx.lineTo(px2, py2 + 5); ctx.lineTo(px2 - 5, py2);
+      ctx.fill();
+    }
 
   // enemies
   for (const e of B.enemies){
@@ -2739,13 +3178,13 @@ function drawBattle(){
     if (!e.alive) alpha = e.dying / 40;
     ctx.globalAlpha = alpha;
     drawSpr(e.spr, e.x - w / 2 + sx, e.y - h / 2 + yo, { scale: sc });
-    if (e.flashT > 0 && e.flashT % 2 === 0){
-      ctx.globalAlpha = 0.6; ctx.fillStyle = "#ffffff";
+    if (e.flashT > 0){ // single smooth fade, no strobe
+      ctx.globalAlpha = 0.45 * (e.flashT / 10); ctx.fillStyle = "#ffffff";
       ctx.fillRect(e.x - w / 2, e.y - h / 2 + yo, w, h);
     }
     ctx.globalAlpha = 1;
     if (e.alive && B.state !== "bullets"){
-      drawTextC(e.name, e.x, e.y + h / 2 + 3, e.spareable ? "#ffe14a" : "#c9c9d8");
+      drawTextC(e.name, e.x, Math.min(e.y + h / 2 + 3, 74), e.spareable ? "#ffe14a" : "#c9c9d8");
       if (e.hpShow > 0){
         ctx.fillStyle = "#3a3f52"; ctx.fillRect(e.x - 20, e.y - h / 2 - 8, 40, 4);
         ctx.fillStyle = "#58c858"; ctx.fillRect(e.x - 20, e.y - h / 2 - 8, Math.max(0, 40 * e.hp / e.maxhp), 4);
@@ -3001,15 +3440,61 @@ function endingScript(){
   }
   script.push(
     { t:"YOU EAT THE MYTHICAL PIZZA ROLLS TOGETHER. THE INSIDES ARE TOO HOT. THE INSIDES ARE ALWAYS TOO HOT." },
-    { t:"AND FOR ONE PERFECT SNACK O'CLOCK, THE COLD WORLD FEELS WARM.",
+    { t:"AND FOR ONE PERFECT SNACK O'CLOCK, THE COLD WORLD FEELS WARM." },
+    { t:"WITH FULL BELLIES AND A LONG SAUSAGE-ROPE CLIMB, THE PARTY HEADS HOME...",
       fn(){
-        G.flags.gotRolls = 1; G.flags.endRoute = endRoute(); saveGame();
+        G.flags.gotRolls = 1; G.flags.endRoute = endRoute(); G.flags.wentHome = 1;
         SFX.eat();
-        G.mode = "end"; G.endTimer = 0;
-        playJingle("victory");
+        enterRoom("kitchen", 66, 128, true);
+        saveGame();
+        say(homecomingScript(), () => saveGame());
       } }
   );
   return script;
+}
+function homecomingScript(){
+  return [
+    { t:"POP! THE FRIDGE DOOR SWINGS OPEN AND THREE HEROES TUMBLE OUT INTO THE KITCHEN." },
+    { p:"dorko", name:"DORKO", t:"HOME. ROLLS ACQUIRED. MISSION NINETY-NINE PERCENT COMPLETE." },
+    { p:"mega", name:"MEGAFIRE", t:"REAL LIGHT. WARM FLOOR TILES. I COULD KISS THIS LINOLEUM. I WON'T. BUT I COULD." },
+    { p:"bmo", name:"BMO", t:"EPILOGUE MODE UNLOCKED! FREE ROAM! CHECK OUT OUR ROOMS, WATCH SOME TV, WHATEVER YOU WANT." },
+    { p:"bmo", name:"BMO", t:"AND WHEN YOU'RE READY TO END THE ADVENTURE FOR REAL... THE PIZZA-MOBILE IS WAITING IN THE GARAGE." },
+    { p:"dorko", name:"DORKO", t:"ONE LAST RIDE. NO RUSH." }
+  ];
+}
+function fridgeScript(){
+  return [{ t:"THE COLD WORLD HUMS SOFTLY BEHIND THE FRIDGE DOOR.", choices:[
+    { t:"GO BACK IN", fn(){
+        say([{ p:"mega", name:"MEGAFIRE", t:"AGAIN? ...FINE. FOR THE FRIENDS WE MADE. AND THE ONES WE HAVEN'T MET." }],
+          () => transitionTo("village", 280, 205));
+      } },
+    { t:"STAY HOME", fn(){
+        say([{ p:"mega", name:"MEGAFIRE", t:"THANK YOU. I WASN'T READY. I MAY NEVER BE." }]);
+      } }
+  ] }];
+}
+function pizzaMobileScript(){
+  return [
+    { t:"THE PIZZA-MOBILE. MARINARA IN THE TANK, A ROLL ON THE ROOF, DESTINY IN THE GLOVEBOX." },
+    { t:"END THE ADVENTURE AND DRIVE INTO THE SUNSET?", choices:[
+      { t:"DRIVE", fn(){
+          say([
+            { p:"dorko", name:"DORKO", t:"PIZZA-MOBILE. ENGINE FULL OF MARINARA. LET'S RIDE." },
+            { p:"mega", name:"MEGAFIRE", t:"I CRIED INSIDE A FRIDGE AND CAME OUT STRONGER. DRIVE, DORKO." },
+            { p:"bmo", name:"BMO", t:"ROLL CREDITS. LITERALLY. THEY'RE PIZZA ROLLS." }
+          ], () => {
+            SFX.boom();
+            stopMusic();
+            G.flags.endRoute = endRoute();
+            G.mode = "end"; G.endTimer = 0;
+            playJingle("victory");
+          });
+        } },
+      { t:"NOT YET", fn(){
+          say([{ p:"dorko", name:"DORKO", t:"NO RUSH. THE SUNSET ISN'T GOING ANYWHERE. PROBABLY." }]);
+        } }
+    ] }
+  ];
 }
 function crispusScript(){
   return [
@@ -3051,7 +3536,7 @@ function drawGameOver(){
   ctx.fillStyle = "#060408"; ctx.fillRect(0, 0, W, H);
   if (GO.t < 60){
     const blink = (GO.t >> 3) % 2 === 0;
-    if (blink || GO.t < 30) drawSpr(soulSpr, 160 - 10, 100 - 9, { scale: 3 });
+    if (blink || GO.t < 30) drawSpr(soulSpr, 160 - soulSpr.width * 1.5, 100 - soulSpr.height * 1.5, { scale: 3 });
   } else {
     ctx.fillStyle = "#e03050";
     GO.shards.forEach(s => { if (s.y < H) ctx.fillRect(s.x, s.y, 3, 3); });
@@ -3101,7 +3586,7 @@ function drawTitle(){
   drawTextC("FRIDGE QUEST", 80, 24, "#9fd8f0");
   ctx.restore();
   drawTextC("AND THE MYTHICAL PIZZA ROLLS", 160, 66, "#ffe14a");
-  drawSpr(rollSpr, 160 - 15, 92 + Math.sin(G.t / 24) * 4, { scale: 3 });
+  drawSpr(rollSpr, 160 - rollSpr.width * 1.5, 92 + Math.sin(G.t / 24) * 4, { scale: 3 });
   const opts = titleOptions();
   opts.forEach((o, i) => {
     const y = 150 + i * 14;
