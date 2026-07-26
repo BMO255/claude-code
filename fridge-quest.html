@@ -1115,6 +1115,7 @@ function loadGame(){
   try { d = JSON.parse(localStorage.getItem("fridgequest")); } catch (e) {}
   if (!d) return false;
   G.party = newParty();
+  if (d.party.length > 3) addBob();
   d.party.forEach((s, i) => { if (G.party[i]){ G.party[i].hp = s.hp; G.party[i].maxhp = s.maxhp; G.party[i].atk = s.atk; } });
   G.tp = d.tp || 0; G.crumbs = d.crumbs || 0; G.inv = d.inv || [];
   G.lv = d.lv || 1; G.exp = d.exp || 0; G.kills = d.kills || 0; G.spares = d.spares || 0;
@@ -2248,9 +2249,9 @@ function drawWorld(){
         if (b.locked){ ctx.fillStyle = "rgba(255,200,106,0.25)"; ctx.fillRect(b.x - 8, b.y - 8, 16, 16); }
       } });
   }
-  for (let i = 2; i >= 0; i--){
+  for (let i = G.party.length - 1; i >= 0; i--){
     const pos = partyMember(i), mem = G.party[i];
-    items.push({ y: pos.y + (2 - i) * 0.01, draw(){ drawCharSprite(mem, pos); } });
+    items.push({ y: pos.y + (G.party.length - 1 - i) * 0.01, draw(){ drawCharSprite(mem, pos); } });
   }
   items.sort((a, b) => a.y - b.y).forEach(it => it.draw());
   ctx.restore();
@@ -2333,9 +2334,10 @@ function updateWorldMenu(){
     if (pressed.down){ eat("down"); m.itemSel = (m.itemSel + 1) % G.inv.length; SFX.move(); }
     if (pressed.z){ eat("z"); SFX.confirm(); m.view = "target"; m.target = 0; }
   } else if (m.view === "target"){
+    const np = G.party.length;
     if (pressed.x){ eat("x"); SFX.cancel(); m.view = "items"; return; }
-    if (pressed.up){ eat("up"); m.target = (m.target + 2) % 3; SFX.move(); }
-    if (pressed.down){ eat("down"); m.target = (m.target + 1) % 3; SFX.move(); }
+    if (pressed.up){ eat("up"); m.target = (m.target + np - 1) % np; SFX.move(); }
+    if (pressed.down){ eat("down"); m.target = (m.target + 1) % np; SFX.move(); }
     if (pressed.z){
       eat("z");
       const id = G.inv[m.itemSel];
@@ -2367,21 +2369,24 @@ function hpBar(x, y, w, hp, maxhp, col){
 }
 function drawWorldMenu(){
   const m = G.menu;
-  drawBox(180, 8, 134, 120);
+  const np = G.party.length;
+  drawBox(180, 8, 134, 30 + np * 26);
   G.party.forEach((p, i) => {
     const y = 16 + i * 26;
     drawText(p.name, 188, y, p.col);
     hpBar(188, y + 9, 80, p.hp, p.maxhp);
     drawText(`${p.hp}/${p.maxhp}`, 272, y + 8, "#c9c9d8");
   });
-  drawText(`TP ${Math.round(G.tp)}%`, 188, 96, "#f0a030");
-  hpBar(230, 97, 50, G.tp, 100, "#f0a030");
-  drawText(`CRUMBS ${G.crumbs}`, 188, 108, "#ffe14a");
-  drawText(`LV ${G.lv}`, 282, 108, "#c9c9d8");
-  drawBox(180, 132, 134, 34);
+  const infoY = 18 + np * 26;
+  drawText(`TP ${Math.round(G.tp)}%`, 188, infoY, "#f0a030");
+  hpBar(230, infoY + 1, 50, G.tp, 100, "#f0a030");
+  drawText(`CRUMBS ${G.crumbs}`, 188, infoY + 12, "#ffe14a");
+  drawText(`LV ${G.lv}`, 282, infoY + 12, "#c9c9d8");
+  const menuY = 42 + np * 26;
+  drawBox(180, menuY, 134, 34);
   ["ITEMS", "CLOSE"].forEach((s, i) => {
-    drawText(s, 200, 140 + i * 11, m.view === "main" && m.sel === i ? "#ffe14a" : "#c9c9d8");
-    if (m.view === "main" && m.sel === i) ctx.drawImage(soulSpr, 190, 141 + i * 11);
+    drawText(s, 200, menuY + 8 + i * 11, m.view === "main" && m.sel === i ? "#ffe14a" : "#c9c9d8");
+    if (m.view === "main" && m.sel === i) ctx.drawImage(soulSpr, 190, menuY + 9 + i * 11);
   });
   if (m.view === "items" || m.view === "target"){
     drawBox(30, 8, 144, 24 + Math.max(1, G.inv.length) * 11);
@@ -2395,7 +2400,7 @@ function drawWorldMenu(){
       drawText(ITEMS[G.inv[m.itemSel]].desc, 12, H - 10, "#8a93a8");
   }
   if (m.view === "target"){
-    drawBox(30, 140, 120, 46);
+    drawBox(30, 140, 120, 18 + G.party.length * 10);
     drawText("USE ON:", 38, 146, "#8a93a8");
     G.party.forEach((p, i) => {
       drawText(p.name, 56, 156 + i * 10, m.target === i ? "#ffe14a" : "#c9c9d8");
@@ -2553,20 +2558,20 @@ function startBattle(groupId, flag){
                warmed:false, x: n === 1 ? 160 : 100 + i * 120, y: 44, seed: i * 977 };
     }),
     state:"intro", stateT:0, ci:0, turn:0,
-    defend:[false,false,false], menuSel:0, subSel:0, targetSel:0, listKind:"",
+    defend:new Array(G.party.length).fill(false), menuSel:0, subSel:0, targetSel:0, listKind:"",
     msg:"", msgQueue:[],
     box:{ x:98, y:70, w:124, h:96 },
     soul:{ x:160, y:118, inv:0 },
     bullets:[], fx:[], dmgNums:[],
     fightX:0, fightDone:false, fightTargets:[],
     phaseT:0, phaseLen:400, slowNext:1, curSlow:1,
-    bossPhase:1, bossDlgQueue:[], canFlee: !(groupId === "tut" || groupId === "boss" || groupId === "kongyFight" || groupId === "secret" || groupId === "ballpitFight" || groupId === "rollyFight" || groupId === "gatorFight"),
+    bossPhase:1, bossDlgQueue:[], canFlee: !["tut", "boss", "kongyFight", "secret", "ballpitFight", "rollyFight", "gatorFight", "doughmerFight"].includes(groupId),
     tutorial: groupId === "tut", tutHintT:0,
     rewardExp:0, rewardCrumbs:0, endFlavor:""
   };
   G.mode = "battle";
   SFX.encounter();
-  playMusic(groupId === "boss" || groupId === "secret" || groupId === "ballpitFight" || groupId === "rollyFight" || groupId === "gatorFight" ? "boss" : "battle");
+  playMusic(["boss", "secret", "ballpitFight", "rollyFight", "gatorFight", "doughmerFight"].includes(groupId) ? "boss" : "battle");
   B.msg = B.tutorial ? "A WILD GHERKIN JIGGLES INTO YOUR PATH!"
         : groupId === "boss" ? "KING GLACION DESCENDS FROM HIS FROSTBITTEN THRONE!"
         : groupId === "kongyFight" ? "KONGY GORGONZOLA BEATS HIS MAGNIFICENT CHEST!"
@@ -2576,6 +2581,8 @@ function startBattle(groupId, flag){
         : groupId === "band" ? "THE QUARTERLY EARNINGS COUNT OFF: ONE! TWO! ONE-TWO-THREE-FOUR!"
         : groupId === "comics" ? "SEVEN ISSUES OF PURE RESENTMENT TAKE WING!"
         : groupId === "gatorFight" ? "SNAPJAW EXPLODES OUT OF THE POOL, JAWS FIRST!"
+        : groupId === "doughmerFight" ? "DOUGHMER RISES LIKE DOUGH. SLOWLY, THEN ALL AT ONCE!"
+        : G.flags.ch5 ? pick(["A CORRUPTED CLIP CRAWLS OUT OF THE TIMELINE!", "THE SERVERS HISS WITH UNENCODED MENACE!", "SOMETHING BUFFERS AGGRESSIVELY IN YOUR DIRECTION!"])
         : G.flags.ch4 ? pick(["SOMETHING RUSTLES IN THE MUCK!", "THE PIPES GURGLE A WARNING!", "IT SMELLS LIKE TROUBLE. AND WORSE."])
         : G.flags.ch3 ? pick(["THE DISCO BALL SPINS FASTER!", "SOMETHING FUNKY THIS WAY COMES!", "THE BEAT DROPS. SO DOES THE TEMPERATURE."])
         : G.flags.ch2 ? pick(["THE DARK CON HUMS WITH STATIC!", "A CHALLENGER LOOMS BETWEEN THE BOOTHS!", "IT SMELLS LIKE ENERGY DRINKS AND MENACE."])
@@ -2593,9 +2600,15 @@ function startBattle(groupId, flag){
 function aliveEnemies(){ return B.enemies.filter(e => e.alive); }
 function aliveParty(){ return G.party.filter(p => p.hp > 0); }
 function nextChar(from){
-  for (let i = from; i < 3; i++) if (G.party[i].hp > 0) return i;
+  for (let i = from; i < G.party.length; i++) if (G.party[i].hp > 0) return i;
   return -1;
 }
+// battle panel geometry adapts to party size (3 or 4)
+function panelGeom(){
+  const n = G.party.length;
+  return n >= 4 ? { x0: 8, gap: 78, w: 74 } : { x0: 12, gap: 100, w: 96 };
+}
+function panelCX(i){ const g = panelGeom(); return g.x0 + i * g.gap + g.w / 2; }
 function battleWon(){ return B.enemies.every(e => !e.alive); }
 
 function setState(s){ B.state = s; B.stateT = 0; B.menuSel = 0; B.subSel = 0; B.targetSel = 0; }
@@ -2625,6 +2638,7 @@ function hurtEnemy(e, dmg){
   if (e.defId === "ballpit") checkBallpitPhase(e);
   if (e.defId === "rolly") checkRollyPhase(e);
   if (e.defId === "gator") checkGatorPhase(e);
+  if (e.defId === "doughmer") checkDoughmerPhase(e);
 }
 function checkChipsPhase(e){
   if (!e.phase2 && e.alive && e.hp <= e.maxhp / 2){
@@ -2801,7 +2815,7 @@ function updateListSel(){
       const wasDown = target.hp <= 0;
       useItem(id, sel.ally);
       B.msg = `${target.name} ${wasDown ? "GOT BACK UP!" : "FEELS RESTORED!"} (${ITEMS[id].name})`;
-      dmgNum(20 + sel.ally * 100 + 40, 180, "+" + (ITEMS[id].heal || ITEMS[id].healAll), "#58e858");
+      dmgNum(panelCX(sel.ally), 180, "+" + (ITEMS[id].heal || ITEMS[id].healAll), "#58e858");
       endCharAction();
     } else if (B.listKind === "HEALALLY"){
       SFX.heal();
@@ -2809,7 +2823,7 @@ function updateListSel(){
       const wasDown = target.hp <= 0;
       target.hp = Math.min(target.maxhp, target.hp + B.healPow);
       B.msg = `BMO BEAMS HEALING PIXELS! ${target.name} ${wasDown ? "GOT BACK UP WITH" : "RECOVERED"} ${B.healPow} HP!`;
-      dmgNum(62 + sel.ally * 100, 178, "+" + B.healPow, "#58e858");
+      dmgNum(panelCX(sel.ally), 178, "+" + B.healPow, "#58e858");
       endCharAction();
     } else if (B.listKind === "ACT2"){
       SFX.confirm();
@@ -2834,8 +2848,10 @@ function castSpell(sp){
   if (sp.kind === "allatk"){
     SFX.spell();
     aliveEnemies().forEach(e => hurtEnemy(e, (c.atk + G.lv * 2) * sp.pow));
-    spellFx("#8ecf5e");
-    B.msg = "DORKO SPINS LIKE A DESTINY FRISBEE! IT HITS EVERYONE!";
+    spellFx(c.id === "bob" ? "#5878e0" : "#8ecf5e");
+    B.msg = c.id === "bob"
+      ? "BOB DETONATES MAGNIFICENTLY! EVERYTHING IS HIT! HE'S FINE! HE'S ALWAYS FINE!"
+      : "DORKO SPINS LIKE A DESTINY FRISBEE! IT HITS EVERYONE!";
     endCharAction(); return;
   }
   if (sp.kind === "atk"){
@@ -3008,6 +3024,13 @@ function enemyBubble(){
       3: ["NOBODY STAYS...", "I JUST WANTED A FULL PIT...", "ONE MORE GUEST. JUST ONE. FOREVER."]
     }[B.bossPhase];
     B.bubble = { text: lines[B.turn % lines.length], e };
+  } else if (e.defId === "doughmer"){
+    const lines = {
+      1: ["MMM... PIZZA ROLLS. *AUDIBLE DROOLING*", "ROLLS... MY ONE WEAKNESS. ALSO DONUTS. TWO WEAKNESSES.", "*HAPPY EATING SOUNDS AT NOTHING*"],
+      2: ["D'OHNUT!!", "STUPID SEXY DODGE PATTERNS.", "MUST... NOT... EAT... THE BULLETS..."],
+      3: ["WHY YOU LITTLE...!!", "ROLLS!! ROOOOOLLS!!", "*INCOHERENT HUNGRY NOISES*"]
+    }[B.bossPhase];
+    B.bubble = { text: lines[B.turn % lines.length], e };
   } else if (e.defId === "gator"){
     const lines = {
       1: ["ROLLS. GIVE. NOW.", "I CAN SMELL THE MARINARA FROM HERE.", "*ENORMOUS JAW SOUNDS*"],
@@ -3035,7 +3058,7 @@ function startBullets(){
   B.bullets = [];
   B.soul.x = B.box.x + B.box.w / 2; B.soul.y = B.box.y + B.box.h / 2; B.soul.inv = 0;
   B.phaseT = 0;
-  B.phaseLen = (B.groupId === "boss" || B.groupId === "ballpitFight" || B.groupId === "rollyFight" || B.groupId === "gatorFight") ? 430 + B.bossPhase * 30 : B.groupId === "secret" ? 430 : 380;
+  B.phaseLen = ["boss", "ballpitFight", "rollyFight", "gatorFight", "doughmerFight"].includes(B.groupId) ? 430 + B.bossPhase * 30 : B.groupId === "secret" ? 430 : 380;
   B.curSlow = B.slowNext; B.slowNext = 1;
   B.tutHintT = B.tutorial ? 240 : 0;
   setState("bullets");
@@ -3043,7 +3066,7 @@ function startBullets(){
 function endBullets(){
   B.bullets = [];
   B.turn++;
-  B.defend = [false, false, false];
+  B.defend = new Array(G.party.length).fill(false);
   B.ci = nextChar(0);
   setState("menu");
   B.msg = defaultMsg();
@@ -3113,16 +3136,17 @@ function applyPartyDamage(dmg){
   const p = G.party[idx];
   const final = Math.max(1, Math.round(dmg * mult));
   p.hp = Math.max(0, p.hp - final);
-  dmgNum(62 + idx * 100, 178, final, "#ff5858");
+  dmgNum(panelCX(idx), 178, final, "#ff5858");
   SFX.hurt();
   shake(5, 10);
   G.flash = { color: "rgba(255,60,60,0.35)", a: 0.5 };
-  if (p.hp <= 0) dmgNum(62 + idx * 100, 188, "DOWN!", "#ff5858");
+  if (p.hp <= 0) dmgNum(panelCX(idx), 188, "DOWN!", "#ff5858");
 }
 function runPattern(e){
   const t = B.phaseT, box = B.box;
   const pat = e.pattern === "boss" ? null : e.pattern;
-  const spdMul = (e.soft ? 0.75 : 1) * ((B.groupId === "boss" || B.groupId === "ballpitFight" || B.groupId === "rollyFight" || B.groupId === "gatorFight") ? 1 + (B.bossPhase - 1) * 0.18 : 1);
+  const BOSS_GROUPS = ["boss", "ballpitFight", "rollyFight", "gatorFight", "doughmerFight"];
+  const spdMul = (e.soft ? 0.75 : 1) * (BOSS_GROUPS.includes(B.groupId) ? 1 + (B.bossPhase - 1) * 0.18 : 1);
   if (e.pattern === "boss"){ bossPattern(e, t, spdMul); return; }
   if (e.pattern === "ballpit"){ ballpitPattern(e, t, spdMul); return; }
   if (e.pattern === "rolly"){ rollyPattern(e, t, spdMul); return; }
@@ -3239,6 +3263,7 @@ function finishBattle(won){
   if (won && gid === "ballpitFight"){ G.flags.ballpitDone = true; G.flags.ballpitSpared = allSpared; }
   if (won && gid === "rollyFight"){ G.flags.rollyDone = true; G.flags.rollySpared = allSpared; }
   if (won && gid === "gatorFight"){ G.flags.gatorDone = true; G.flags.gatorSpared = allSpared; }
+  if (won && gid === "doughmerFight"){ G.flags.doughmerDone = true; G.flags.doughmerSpared = allSpared; }
   if (won && gid === "kongyFight") G.flags.kongySpared = allSpared;
   if (won && gid === "secret") G.flags.secretSpared = allSpared;
   if (won && gid === "comics") G.flags.comicsSpared = allSpared;
@@ -3252,7 +3277,8 @@ function finishBattle(won){
     ballpitFight: { script: () => postBallpitScript(), done: () => G.flags.ch2Done },
     comics:       { script: () => postComicsScript(),  done: () => G.flags.boardroomOpen },
     rollyFight:   { script: () => postRollyScript(),   done: () => G.flags.ch3Done },
-    gatorFight:   { script: () => postGatorScript(),   done: () => G.flags.ch4Done }
+    gatorFight:   { script: () => postGatorScript(),   done: () => G.flags.ch4Done },
+    doughmerFight:{ script: () => postDoughmerScript(),done: () => G.flags.ch5Done }
   };
   const pm = postMap[gid];
   if (won && pm){
@@ -3395,16 +3421,17 @@ function drawBattle(){
   // damage numbers
   for (const d of B.dmgNums) drawTextC(d.s, d.x, d.y, d.col);
 
-  // party panels
+  // party panels (layout adapts to 3 or 4 members)
+  const pg = panelGeom();
   G.party.forEach((p, i) => {
-    const x = 12 + i * 100, y = 176;
+    const x = pg.x0 + i * pg.gap, y = 176;
     const active = B.state !== "bullets" && B.ci === i && ["menu", "target", "list", "fightbar"].includes(B.state);
-    drawBox(x, y, 96, 34, p.hp <= 0 ? "#1a1218" : "#101018", active ? "#ffe14a" : "#5a5f72");
-    drawText(p.name, x + 6, y + 4, p.hp <= 0 ? "#5a5f72" : p.col);
-    hpBar(x + 6, y + 14, 56, p.hp, p.maxhp);
-    drawText(p.hp <= 0 ? "DOWN" : `${p.hp}`, x + 66, y + 12, p.hp <= 0 ? "#e05858" : "#c9c9d8");
-    if (B.defend[i]) drawText("GRD", x + 66, y + 24, "#5ea8e8");
-    if (active && (G.t >> 4) % 2 === 0) ctx.drawImage(soulSpr, x + 86, y + 4);
+    drawBox(x, y, pg.w, 34, p.hp <= 0 ? "#1a1218" : "#101018", active ? "#ffe14a" : "#5a5f72");
+    drawText(p.name, x + 4, y + 4, p.hp <= 0 ? "#5a5f72" : p.col);
+    hpBar(x + 4, y + 14, pg.w - 38, p.hp, p.maxhp);
+    drawText(p.hp <= 0 ? "DOWN" : `${p.hp}`, x + pg.w - 30, y + 12, p.hp <= 0 ? "#e05858" : "#c9c9d8");
+    if (B.defend[i]) drawText("GRD", x + pg.w - 30, y + 24, "#5ea8e8");
+    if (active && (G.t >> 4) % 2 === 0) ctx.drawImage(soulSpr, x + pg.w - 10, y + 4);
   });
 
   // command row
@@ -5687,17 +5714,597 @@ function postGatorScript(){
 function ladderScript(){
   return [
     { t:"THE LADDER STANDS WHOLE AGAIN, MORNING LIGHT SPILLING DOWN THE SHAFT." },
-    { t:"CLIMB OUT? FOR REAL, ACTUALLY, FINALLY REAL THIS TIME?", choices:[
+    { t:"CLIMB OUT? FOR REAL THIS TIME?", choices:[
       { t:"CLIMB OUT", fn(){
           say([
-            { p:"dorko", name:"DORKO", t:"FOUR DARK WORLDS. ONE FAMILY OF ROLLS. IF THERE'S A FIFTH, I'M EATING IT." },
-            { p:"mega", name:"MEGAFIRE", t:"I NEED A SHOWER, A NAP, AND POSSIBLY A SUPPORT GROUP FOR PEOPLE WHO KEEP FALLING INTO KINGDOMS." },
-            { t:"BOB CLIMBS OUT LAST, EYES WATERING IN THE DAYLIGHT." },
-            { p:"bob", name:"BOB", t:"DAYLIGHT. REAL DAYLIGHT. YOU GUYS NEED A ROOMMATE? I'M QUIET. EXCEPT WHEN I'M NOT." },
-            { p:"bmo", name:"BMO", t:"NEW PARTY MEMBER UNLOCKED AT THE VERY END. CLASSIC. WELCOME HOME, BOB." },
-            { t:"YOU WALK HOME TOGETHER IN THE MORNING SUN, DAMP AND VICTORIOUS, ROLLS HELD HIGH." }
+            { p:"bob", name:"BOB", t:"WAIT. BEFORE WE GO UP. CAN I COME WITH YOU? OFFICIALLY? PARTY MEMBER? I'VE NEVER BEEN A PARTY MEMBER." },
+            { p:"dorko", name:"DORKO", t:"YOU EXPLODE ON COMMAND AND YOU'RE PUNCTUAL. HIRED. WELCOME TO THE PARTY, BOB." },
+            { t:"BOB JOINED THE PARTY! HE FALLS IN LINE BEHIND BMO, TICKING WITH JOY." },
+            { p:"mega", name:"MEGAFIRE", t:"FOUR OF US NOW. A REAL ADVENTURING PARTY. NOTHING CAN SURPRISE US ANYMORE." },
+            { t:"YOU CLIMB THE LADDER, UP AND UP, TOWARD THE DAYLIGHT..." }
           ], () => {
             G.flags.ch4Done = 1;
+            addBob();
+            enterRoom("serverhall", 60, 150, true);
+            G.flags.ch5 = 1;
+            tone(400, 0.7, "sawtooth", 0.22, 40); // the lights die. again.
+            saveGame();
+            say(ch5ArrivalScript());
+          });
+        } },
+      { t:"NOT YET", fn(){ say([{ p:"bob", name:"BOB", t:"TAKE YOUR TIME. I'VE WAITED WEEKS. I CAN WAIT FIVE MORE MINUTES. BARELY." }]); } }
+    ] }
+  ];
+}
+// ================= CHAPTER 5: THE SERVER ROOM (YTP WORLD) =================
+
+// ---- Bob as a real party member ----
+function addBob(){
+  if (G.party.some(p => p.id === "bob")) return;
+  G.party.push({ id:"bob", name:"BOB", hp:65, maxhp:65, atk:12, sprF:bobSpr, sprB:bobSpr, col:"#5878e0" });
+}
+SPELLS.bob = [ { name:"KABOOM", cost:30, kind:"allatk", pow:1.6, desc:"CONTROLLED SELF-EXPLOSION. HITS ALL." } ];
+ITEM_REACTIONS.bob = [
+  "I DON'T EAT. I ABSORB MORALE. THANK YOU FOR THE MORALE.",
+  "*HAPPY TICKING NOISES*",
+  "FUEL FOR THE FUSE. PLEASE KEEP ACTUAL FOOD AWAY FROM MY ACTUAL FUSE."
+];
+
+// ---- sprites ----
+const mrpPal = { P:"#8a3cb0", Q:"#5c2478", s:"#f2c9a2", N:"#e88a78", k:"#14141c", w:"#ffffff" };
+const mrpSpr = S([
+"....PPPPPPP.....",
+"....PPPPPPP.....",
+"....PPPPPPP.....",
+"....QQQQQQQ.....",
+"..PPPPPPPPPPP...",
+"...ssssssss.....",
+"..sskssssksss...",
+"..sssssssssss...",
+"..sssNNNNssss...",
+"..ssNNNNNNsss...",
+".kkkkkkkkkkkk...",
+"..kkkk..kkkk....",
+"...PPPPPPPP.....",
+"..PPPPPPPPPP....",
+".wPPPPPPPPPPw...",
+"..PPPPPPPPPP....",
+"...PPP..PPP.....",
+"...PPP..PPP.....",
+"..QQQQ..QQQQ....",
+], mrpPal);
+const mrpPort = S([
+"......PPPPPPPPPP........",
+"......PPPPPPPPPP........",
+"......PPPPPPPPPP........",
+"......QQQQQQQQQQ........",
+"...PPPPPPPPPPPPPPPP.....",
+".....ssssssssssss.......",
+"....sskkssssssskkss.....",
+"....sskkssssssskkss.....",
+"....ssssssssssssssss....",
+"....sssssNNNNNNsss......",
+"....ssssNNNNNNNNsss.....",
+"....ssssNNNNNNNNsss.....",
+"...kkkkkkkkkkkkkkkk.....",
+"....kkkkkk..kkkkkk......",
+".....kkkk....kkkk.......",
+"......PPPPPPPPPP........",
+"........................",
+], mrpPal);
+PORTRAITS.mrp = mrpPort;
+VOICES.mrp = 260;
+const doughmerPal = { Y:"#f5d842", n:"#e8bc30", t:"#c9a05c", S:"#f2f2ee", b:"#4a6ab0", k:"#14141c", w:"#ffffff" };
+const doughmerSpr = S([
+"....k......k....",
+"...YYYYYYYYYY...",
+"..YYYYYYYYYYYY..",
+".YYwwYYYYYYwwYY.",
+".YYwkYYYYYYwkYY.",
+".YYYYYYYYYYYYYY.",
+".YYYYYnnnnYYYYY.",
+".YttttttttttttY.",
+".tttttkkkkttttt.",
+".tttttttttttttt.",
+"..SSSSSSSSSSSS..",
+".SSSSSSSSSSSSSS.",
+"YSSSSSSSSSSSSSSY",
+"YSSSSSSSSSSSSSSY",
+"..bbbbbbbbbbbb..",
+"..bbbb....bbbb..",
+"..bbbb....bbbb..",
+"..kkkk....kkkk..",
+], doughmerPal);
+const bufferSpr = S([
+".....cc.cc.....",
+"...c.......c...",
+"..c..wkkw...c..",
+".cc..kwwk..cc..",
+".c...........c.",
+".cc.........cc.",
+"..c.........c..",
+"...c.......c...",
+".....cc.cc.....",
+], { c:"#58a0e0", w:"#ffffff", k:"#14141c" }, null);
+const pooplingSpr = S([
+"..g...g.....",
+"..gg.gg.....",
+".ggggggg....",
+".gwkggwkg...",
+".ggggggg....",
+"ggkgggkgg...",
+".ggkkkgg....",
+".ggggggg....",
+"..gg.gg.....",
+".gg...gg....",
+], { g:"#7ab04a", w:"#ffffff", k:"#14141c" });
+const feshSpr = S([
+"...cccccc...",
+"..cccccccc..",
+"..hhhhhhhh..",
+".hyyyyyyyyh.",
+".hykyyyykyh.",
+"..yyyyyyyy..",
+"..jjrrjjrr..",
+".jrrjjrrjjr.",
+".jjrrjjrrjj.",
+"..jjjjjjjj..",
+"...jj..jj...",
+"...kk..kk...",
+], { c:"#e05858", h:"#3a2c1c", y:"#8a5a3c", j:"#40e0d0", r:"#e040c0", k:"#14141c" });
+const morshuSpr = S([
+"...rrrrrrr....",
+"..rrrrrrrrr...",
+"..syyyyyyys...",
+"..sykyyykys...",
+"..syyynyyys...",
+"..bbbbbbbbb...",
+".bbbbbbbbbbb..",
+".bbsssssssbb..",
+"..bsssssssb...",
+"..vvvvvvvvv...",
+"..vrrrrrrrv...",
+"..vrrrrrrrv...",
+"...rr...rr....",
+"...kk...kk....",
+], { r:"#c04838", s:"#e8b078", y:"#e8b078", k:"#14141c", n:"#c07850", b:"#5c4a3c", v:"#8a3c30" });
+const kingSpr = S([
+".y.y.y.y.y....",
+".yyyyyyyyy....",
+"..sssssss.....",
+"..skssks s....",
+"..sssssss.....",
+".sswwwwwss....",
+"..wwwwwww.....",
+".rrrrrrrrrr...",
+".rrryyyrrrr...",
+".rrrrrrrrrr...",
+".rrrrrrrrrr...",
+"..rrrrrrrr....",
+"...rr..rr.....",
+"...kk..kk.....",
+], { y:"#ffe14a", s:"#e8b078", w:"#c9c9d8", r:"#a83050", k:"#14141c" });
+const squadalaSpr = S([
+"...ggggg.....",
+"..ggggggg....",
+"..sksssks....",
+"..sssssss....",
+".sswwwwwss...",
+"..wwwwwww....",
+"..wwwwwww....",
+".ggggggggg...",
+".ggggggggg...",
+"..ggggggg....",
+"rrrrrrrrrrrr.",
+".rrrrrrrrrr..",
+], { g:"#58a058", s:"#e8b078", w:"#e8e8f0", r:"#c04838", k:"#14141c" });
+
+// ---- ch5 music: chaotic remix energy ----
+Object.assign(SONGS, {
+  ytp: {
+    bpm: 132, tracks: [
+      { wave: "square", vol: 0.10, seq:
+        "C5 C5 .  C6 .  G4 .  C5 E5 .  E4 E5 .  B5 .  .  D5 D5 .  D4 .  A5 .  F4 A4 .  A5 .  C5 .  G5 ." },
+      { wave: "sawtooth", vol: 0.045, seq:
+        ".  .  E4 .  .  .  E4 G4 .  .  F4 .  .  .  F4 A4 .  .  G4 .  .  .  G4 B4 .  .  E4 .  G4 .  E4 ." },
+      { wave: "triangle", vol: 0.25, seq:
+        "C2 C3 C2 C3 F2 F3 F2 F3 G2 G3 G2 G3 E2 E3 E2 E3 C2 C3 C2 C3 F2 F3 F2 F3 G2 G3 G2 G3 C2 C3 G2 C2" },
+    ],
+    noise: "k . s h k h s . k . s h k h s h k . s h k h s . k h s h k s s s"
+  }
+});
+
+// ---- ch5 items + Morshu's shop ----
+Object.assign(ITEMS, {
+  lampoil: { name:"LAMP OIL", heal:55, desc:"SURPRISINGLY DRINKABLE. 55 HP." },
+  rope:    { name:"ROPE",     heal:10, tp:45, desc:"YOU FEEL SECURELY ATTACHED. 10 HP, 45% TP." },
+  bombs:   { name:"BOMBS",    heal:50, desc:"EXPLOSIVE NUTRITION. DO NOT ASK. 50 HP." }
+});
+const MORSHU_STOCK = [ ["lampoil", 25], ["rope", 35], ["bombs", 45] ];
+function morshuShop(){
+  const choices = MORSHU_STOCK.map(([id, price]) => ({
+    t: `${ITEMS[id].name} ${price}`,
+    fn(){
+      if (G.crumbs < price){
+        say([{ p:"morshu", name:"MORSHU", t:"SORRY, LIZARD. I CAN'T GIVE CREDIT. COME BACK WHEN YOU'RE A LITTLE... MMMMM... RICHER.", fn: morshuShop }]);
+        return;
+      }
+      if (G.inv.length >= 8){ say([{ t:"MORSHU EYES YOUR BULGING POCKETS. 'MMMM. NO ROOM. NO SALE.'", fn: morshuShop }]); return; }
+      G.crumbs -= price; G.inv.push(id);
+      tone(90, 0.5, "triangle", 0.3, 70);
+      say([{ p:"morshu", name:"MORSHU", t:"MMMMMMM.", fn: morshuShop }]);
+    }
+  }));
+  choices.push({ t:"LEAVE", fn(){ say([{ p:"morshu", name:"MORSHU", t:"COME BACK ANYTIME. I'LL BE HERE. I'M ALWAYS HERE. MMMM." }]); } });
+  say([{ p:"morshu", name:"MORSHU", t:`LAMP OIL? ROPE? BOMBS? YOU WANT IT? IT'S YOURS, MY FRIEND. AS LONG AS YOU HAVE ENOUGH CRUMBS. (${G.crumbs})`, choices }]);
+}
+const morshuPort = S([
+"......rrrrrrrrrr........",
+".....rrrrrrrrrrrr.......",
+"....ssssssssssssss......",
+"....sskkssssssskkss.....",
+"....ssssssssssssss......",
+"....ssssssnnssssss......",
+"....ssssnnnnnnssss......",
+"...bbbbbbbbbbbbbbbb.....",
+"..bbbbbbbbbbbbbbbbbb....",
+"..bbbsssssssssssssbb....",
+"..bbssssssssssssssbb....",
+"...bbssssssssssssbb.....",
+"....bbbbbbbbbbbbbb......",
+"........................",
+], { r:"#c04838", s:"#e8b078", n:"#c07850", b:"#5c4a3c", k:"#14141c" });
+PORTRAITS.morshu = morshuPort;
+VOICES.morshu = 180;
+
+// ---- ch5 enemies ----
+Object.assign(ENEMY_DEFS, {
+  bufferwheel: {
+    name:"BUFFERWHEEL", spr:bufferSpr, hp:100, atk:9, def:2, exp:44, crumbs:40, pattern:"spin",
+    check:"BUFFERWHEEL - ATK 9 DEF 2. AN ETERNAL LOADING ICON. IT HAS BEEN AT 99 PERCENT SINCE THE BEFORE-TIMES.",
+    quotes:["PLEASE WAIT. PLEASE WAIT. PLEASE WAIT.","YOUR PATIENCE IS IMPORTANT TO US.","99 PERCENT. ALWAYS 99 PERCENT.","*SPINNING INTENSIFIES*"],
+    acts:[
+      { t:"WAIT PATIENTLY", fn(e){ e.mercy++;
+          if (e.mercy >= 2){ e.spareable = true; return "YOU WAIT. GENUINELY. CALMLY. THE WHEEL FINISHES LOADING: IT'S A VIDEO OF A CAT. IT WAS WORTH IT. IT'S FREE NOW."; }
+          return "YOU WAIT WITHOUT SIGHING EVEN ONCE. THE WHEEL SPINS A LITTLE SOFTER. NOBODY'S EVER WAITED NICELY BEFORE."; } },
+      { t:"REFRESH", fn(e){ e.atk = Math.max(3, e.atk - 2); return "YOU HIT REFRESH. THE WHEEL LOSES ITS PLACE AND SOME OF ITS CONFIDENCE. ATTACK DOWN!"; } }
+    ],
+    killText:"THE BUFFERWHEEL STOPS AT 99 PERCENT. FOREVER. SOMEHOW THAT'S WORSE.",
+    spareText:"THE BUFFERWHEEL ROLLS AWAY AT FULL SPEED, FULLY LOADED, FULLY ALIVE."
+  },
+  poopling: {
+    name:"POOPLING", spr:pooplingSpr, hp:80, atk:9, def:1, exp:40, crumbs:34, pattern:"pow",
+    check:"POOPLING - ATK 9 DEF 1. A LITTLE GREMLIN MADE OF SCRAMBLED CLIPS AND REVERSED AUDIO.",
+    quotes:["!SDRAWKCAB SI GNIHTYREVE","YOU WANT IT? IT'S YOURS MY FRIE- YOU WANT IT? YOU WANT IT?","*VHS REWIND SCREECH*","THIS! IS A STORY! ALL ABOUT! THIS! IS A STORY!"],
+    acts:[
+      { t:"TALK BACKWARDS", fn(e){ e.reversed = true; return "YOU SAY 'DNEIRF YM OLLEH'. THE POOPLING FREEZES. NOBODY HAS EVER SPOKEN ITS LANGUAGE BEFORE."; } },
+      { t:"SUBSCRIBE", fn(e){
+          if (e.reversed){ e.spareable = true; return "YOU SUBSCRIBE AND RING THE IMAGINARY BELL. THE POOPLING ACHIEVES ITS LIFELONG DREAM AND CALMS COMPLETELY."; }
+          return "IT DOESN'T TRUST A SUBSCRIBER WHO WON'T SPEAK ITS TONGUE. TALK BACKWARDS FIRST."; } }
+    ],
+    killText:"THE POOPLING DELETES ITSELF. THIS CLIP WILL NOT BE IN THE SEQUEL.",
+    spareText:"THE POOPLING LOOPS ITS FAVORITE THREE FRAMES OF ITSELF WAVING GOODBYE, FOREVER."
+  },
+  doughmer: {
+    name:"DOUGHMER", spr:doughmerSpr, hp:700, atk:12, def:4, exp:400, crumbs:350, pattern:"dough",
+    check:"DOUGHMER - ATK 12 DEF 4. A LEGALLY DISTINCT YELLOW FATHER FIGURE. HE SMELLED YOUR ROLLS THROUGH THE FIREWALL.",
+    quotes:[],
+    acts:[
+      { t:"OFFER DONUT", fn(e){
+          e.mercy++;
+          if (e.mercy === 1) return "YOU MIME A DONUT. DOUGHMER EATS THE MIME. THE WHOLE MIME. HE LOOKS SLIGHTLY CALMER.";
+          e.donuts = true;
+          return "YOU DRAW A DONUT ON A NAPKIN. HE EATS THE NAPKIN, THE DRAWING, AND THE PEN. HE'S LISTENING NOW."; } },
+      { t:"HIT PLAY", fn(e){
+          if (e.donuts){ e.spareable = true; return "THE GIANT SCREEN FLICKERS ON: A YELLOW FAMILY SITS ON A COUCH. DOUGHMER GASPS. SOMEWHERE, MR. P MATERIALIZES WITH POPCORN."; }
+          return "HE'S TOO HUNGRY TO SIT STILL FOR TELEVISION. DONUTS FIRST. IT'S SCIENCE."; } }
+    ],
+    killText:"DOUGHMER SLUMPS LIKE A SUNDAY AFTERNOON. THE SCREEN PLAYS STATIC. SOMEWHERE, MR. P WEEPS INTO HIS TOP HAT.",
+    spareText:"DOUGHMER SINKS INTO AN INVISIBLE COUCH, UTTERLY AT PEACE. MR. P JOINS HIM. NEITHER SPEAKS. PERFECTION."
+  }
+});
+Object.assign(GROUPS, {
+  cc1: ["bufferwheel"], cc2: ["poopling", "bufferwheel"],
+  doughmerFight: ["doughmer"]
+});
+function checkDoughmerPhase(e){
+  const frac = e.hp / e.maxhp;
+  if (B.bossPhase === 1 && frac <= 0.66 && e.alive){
+    B.bossPhase = 2;
+    B.bossDlgQueue.push([
+      { t:"DOUGHMER: MMM... FORBIDDEN DODGE-NUTS. *DISTRACTED DROOLING*" },
+      { t:"HE FIGHTS AND SNACKS SIMULTANEOUSLY. TRULY, LEGALLY DISTINCT." }
+    ]);
+  }
+  if (B.bossPhase === 2 && frac <= 0.33 && e.alive){
+    B.bossPhase = 3;
+    B.bossDlgQueue.push([
+      { t:"DOUGHMER: WHY YOU LITTLE... ROLL-WITHHOLDERS!!" },
+      { p:"bob", name:"BOB", t:"HE'S STRANGLING THE AIR! WHO IS HE STRANGLING?! THERE'S NOBODY THERE!" },
+      { p:"mega", name:"MEGAFIRE", t:"HE'S HUNGRY AND SAD. FIVE FOR FIVE. IT'S ALWAYS HUNGRY AND SAD." }
+    ]);
+  }
+}
+Object.assign(EXTRA_PATTERNS, {
+  spin(e, t, spdMul, box){
+    if (t % 10 === 0){
+      const a = t * 0.2 + e.seed;
+      spawnBullet({ x: box.x + box.w / 2, y: box.y + box.h / 2 - 12,
+        vx: Math.cos(a) * 1.35 * spdMul, vy: Math.sin(a) * 1.35 * spdMul, r: 4, dmg: e.atk, col:"#58a0e0", kind:"ring" });
+    }
+    if (t % 80 === 40) aimShot(e, box, 2.0 * spdMul, "#ffffff", "ball", 4);
+  },
+  dough(e, t, spdMul, box){
+    const ph = B.bossPhase;
+    if (t % (ph === 1 ? 44 : 58) === 8){
+      aimShot(e, box, 2.1 * spdMul, "#e8a0c0", "ring", 5);
+      if (ph >= 2) aimShot(e, box, 2.1 * spdMul, "#c9a05c", "ring", 5, 0.5);
+    }
+    if (t % 50 === 26){
+      const gap = (Math.sin(t * 0.018 + e.seed) * 0.5 + 0.5) * (box.w - 44) + box.x + 22;
+      for (let x = box.x + 8; x < box.x + box.w - 4; x += 22)
+        if (Math.abs(x - gap) >= 18)
+          spawnBullet({ x, y: box.y + 4, vx: 0, vy: 1.3 * spdMul, r: 4, dmg: e.atk, col:"#e8a0c0", kind:"ring" });
+    }
+    if (ph >= 2 && t % 14 === 0){
+      const a = t * 0.15;
+      spawnBullet({ x: box.x + box.w / 2, y: box.y + box.h / 2 - 10,
+        vx: Math.cos(a) * 1.3 * spdMul, vy: Math.sin(a) * 1.3 * spdMul, r: 3, dmg: e.atk, col:"#9fd8f0", kind:"ball" });
+    }
+    if (ph >= 3 && t % 120 === 60)
+      spawnBullet({ x: box.x + box.w - 12, y: box.y + 8, vx: -0.5, vy: 0.5, r: 5, dmg: e.atk + 2, col:"#9fd8f0", kind:"homing", life: 250 });
+  }
+});
+
+// ---- ch5 rooms ----
+Object.assign(ROOMS, {
+  serverhall: {
+    w: 320, h: 240, music: "ytp", dark: true,
+    floor: "#101820",
+    walls: [
+      { x:0, y:0, w:320, h:70 }, { x:0, y:226, w:320, h:14 },
+      { x:0, y:0, w:14, h:240 },
+      { x:306, y:0, w:14, h:120 }, { x:306, y:176, w:14, h:64 },
+      { x:60, y:70, w:40, h:50 }, { x:220, y:70, w:40, h:50 }
+    ],
+    deco(){
+      diamondFloor(320, 240, "#182430", 18);
+      wallFace(0, 0, 320, 70, "#0a1018", "#16222e");
+      serverRack(60, 40); serverRack(220, 40);
+      drawTextC("NOW HOSTING: 40 BILLION VIDEOS", 160, 22, "#40e0d0");
+      drawTextC("(CURRENTLY HOSTING: 0)", 160, 34, "#e05858");
+    },
+    npcs: [
+      { id:"srvsign", x:160, y:100, spr:null, w:16, h:12, sign:true,
+        dlg(){ return [
+          { t:"A MONITOR DISPLAYS AN ERROR: 'PLAYBACK FAILED. EVERY VIDEO EVER IS DOWN. SOMEONE IS HOARDING THE ARCHIVE.'" },
+          { p:"bmo", name:"BMO", t:"EVERY VIDEO EVER?! THIS IS A CRIME SCENE. THIS IS THE CRIME SCENE." }
+        ]; } }
+    ],
+    saves: [ { x:60, y:190 } ],
+    exits: [ { x:312, y:120, w:8, h:56, to:"memeplaza", tx:26, ty:150, dir:"right" } ],
+    spawns: []
+  },
+  memeplaza: {
+    w: 560, h: 300, music: "ytp", dark: false,
+    floor: "#141c28",
+    walls: [
+      { x:0, y:0, w:560, h:70 }, { x:0, y:286, w:560, h:14 },
+      { x:0, y:0, w:14, h:120 }, { x:0, y:176, w:14, h:124 },
+      { x:550, y:0, w:14, h:120 }, { x:550, y:176, w:14, h:124 },
+      { x:200, y:70, w:160, h:30 },  // the big frozen screen
+      { x:70, y:70, w:70, h:40 }     // morshu's stall
+    ],
+    deco(){
+      checkerFloor(560, 286, "#1c2836", 20, 70);
+      wallFace(0, 0, 560, 70, "#0c141e", "#1a2530");
+      // the big screen, frozen mid-episode
+      ctx.fillStyle = "#14141c"; ctx.fillRect(200, 34, 160, 66);
+      ctx.fillStyle = "#3a5878"; ctx.fillRect(206, 40, 148, 52);
+      ctx.fillStyle = "#f5d842"; ctx.fillRect(250, 58, 16, 16); ctx.fillRect(286, 56, 14, 18);
+      ctx.fillStyle = "#e05858"; drawTextC("BUFFERING... 99%", 280, 46, "#e05858");
+      // morshu's stall
+      ctx.fillStyle = "#5a3c28"; ctx.fillRect(70, 70, 70, 40);
+      ctx.fillStyle = "#7a5438"; ctx.fillRect(74, 74, 62, 12);
+      drawTextC("SHOP", 105, 60, "#ffe14a");
+      ctx.fillStyle = "#c9a05c"; ctx.fillRect(80, 90, 10, 14);
+      ctx.fillStyle = "#e8e8f0"; ctx.fillRect(98, 92, 12, 4); ctx.fillRect(100, 88, 4, 12);
+      ctx.fillStyle = "#3a3f52"; ctx.fillRect(118, 88, 12, 14);
+      drawTextC("MEME PLAZA", 280, 16, "#e040c0");
+    },
+    npcs: [
+      { id:"morshu", x:105, y:124, spr:morshuSpr, w:12, h:12, solid:true, name:"MORSHU",
+        dlg(){ return [{ p:"morshu", name:"MORSHU", t:"MMMM. CUSTOMERS. WELCOME, WELCOME.", fn: morshuShop }]; } },
+      { id:"mrp", x:280, y:126, spr:mrpSpr, w:12, h:14, solid:true, name:"MR. P",
+        dlg(n){
+          if (n === 0) return [
+            { p:"mrp", name:"MR. P", t:"THE SERVERS DIED MID-EPISODE. SEASON FIVE. THE GOOD SEASONS. I'VE BEEN STARING AT THIS FROZEN FRAME FOR... WHAT YEAR IS IT?" },
+            { p:"mrp", name:"MR. P", t:"PURPLE SUIT? TAILORED. TOP HAT? INHERITED. MUSTACHE? EARNED. THE SIMPSONS? REQUIRED. AND SOME YELLOW GLUTTON IN THE ARCHIVE IS HOARDING EVERY VIDEO EVER MADE." },
+            { p:"mrp", name:"MR. P", t:"HE'S ALSO SNIFFING AROUND FOR... PIZZA ROLLS, I HEAR. GO SORT HIM OUT. AND BRING ME BACK MY SHOW." },
+            { p:"dorko", name:"DORKO", t:"HE WANTS THE WHAT NOW. EVERYONE, WE'RE LEAVING. EAST. FAST." }
+          ];
+          return [{ p:"mrp", name:"MR. P", t:"I CAN HEAR THE THEME SONG IN MY HEART. IT'S GETTING FAINTER. HURRY." }];
+        } },
+      { id:"fesh", x:420, y:140, spr:feshSpr, w:10, h:12, solid:true, name:"THE FESH PINCE",
+        dlg(n){
+          if (n % 2 === 0) return [
+            { t:"THE FESH PINCE: NOW THIS IS A STORY ALL ABOUT HOW. HOW. HOW. MY LIFE GOT FLIPPED. FLIPPED. TURNED UPSIDE FLIPPED." }
+          ];
+          noiseHit(0.3, 0.2, 3.2);
+          return [
+            { t:"THE FESH PINCE: IN WEST. IN WEST. IN WEST PHILADELPHIA, BORN AND. BORN AND. *VHS REWIND NOISE*" },
+            { p:"bmo", name:"BMO", t:"HIS EDITING IS IMMACULATE. HIS TIMELINE IS A WAR CRIME." }
+          ];
+        } },
+      { id:"theking", x:180, y:200, spr:kingSpr, w:12, h:12, solid:true, name:"THE KING",
+        dlg(n){
+          return n % 2 ? [{ t:"THE KING: MAH BOI, THIS PLAZA IS WHAT ALL TRUE WARRIORS STRIVE FOR." }]
+                       : [{ t:"THE KING: I WONDER WHAT'S FOR DINNER." },
+                          { p:"mega", name:"MEGAFIRE", t:"(HE SAYS IT WITH SUCH HOPE. EVERY TIME. NOBODY EVER TELLS HIM.)" }];
+        } },
+      { id:"squadala", x:460, y:230, spr:squadalaSpr, w:12, h:10, solid:true, name:"SQUADALA MAN",
+        dlg(){ return [
+          { t:"SQUADALA MAN: SQUADALA! WE ARE OFF! ...NOWHERE. THE CARPET'S OUT OF BATTERY." },
+          { t:"SQUADALA MAN: SQUADALA IS A LIFESTYLE, NOT A GUARANTEE." }
+        ]; } },
+      { id:"buffghost", x:340, y:220, spr:bufferSpr, w:10, h:10, solid:true, name:"OLD BUFFERER",
+        dlg(){ return [{ t:"OLD BUFFERER: I'VE BEEN AT 99 PERCENT SINCE 2011. I'VE MADE MY PEACE. HAVE YOU?" }]; } }
+    ],
+    saves: [ { x:280, y:200 } ],
+    exits: [
+      { x:0, y:120, w:8, h:56, to:"serverhall", tx:290, ty:148, dir:"left" },
+      { x:552, y:120, w:8, h:56, to:"codecrypt", tx:26, ty:110, dir:"right" }
+    ],
+    spawns: []
+  },
+  codecrypt: {
+    w: 640, h: 200, music: "ytp", dark: true,
+    floor: "#101820",
+    walls: [
+      { x:0, y:0, w:640, h:52 }, { x:0, y:186, w:640, h:14 },
+      { x:0, y:0, w:14, h:82 }, { x:0, y:138, w:14, h:62 },
+      { x:630, y:0, w:14, h:82 }, { x:630, y:138, w:14, h:62 },
+      { x:200, y:52, w:36, h:56 }, { x:420, y:110, w:36, h:76 }
+    ],
+    deco(){
+      diamondFloor(640, 200, "#182430", 18);
+      wallFace(0, 0, 640, 52, "#0a1018", "#16222e");
+      serverRack(200, 26); serverRack(420, 100);
+      // fat cable bundles along the floor
+      ctx.fillStyle = "#26323e";
+      ctx.fillRect(0, 96, 640, 6); ctx.fillRect(0, 160, 640, 5);
+      ctx.fillStyle = "#40e0d0";
+      for (let x = ((G.t / 2) % 60); x < 640; x += 60) ctx.fillRect(x, 97, 8, 2);
+      drawTextC("THE ENCODING CRYPT", 320, 30, "#8a5fb0");
+    },
+    npcs: [
+      { id:"ccsign", x:60, y:100, spr:null, w:16, h:12, sign:true,
+        dlg(){ return [{ t:"WARNING: UNENCODED MEMES ROAM BEYOND THIS POINT. KEEP YOUR AUDIO REVERSED AND YOUR EXPECTATIONS LOW." }]; } }
+    ],
+    saves: [],
+    exits: [
+      { x:0, y:82, w:8, h:56, to:"memeplaza", tx:526, ty:148, dir:"left" },
+      { x:632, y:82, w:8, h:56, to:"archive", tx:30, ty:150, dir:"right" }
+    ],
+    spawns: [
+      { id:"cc_buf", x:300, y:130, spr:bufferSpr, group:"cc1",
+        patrol:{ axis:"x", range:36, spd:0.025 }, flag:"e_cc1" },
+      { id:"cc_poop", x:520, y:150, spr:pooplingSpr, group:"cc2",
+        patrol:{ axis:"y", range:20, spd:0.03 }, flag:"e_cc2" }
+    ]
+  },
+  archive: {
+    w: 320, h: 240, music: "ytp", dark: () => !G.flags.doughmerDone,
+    floor: "#141c28",
+    walls: [
+      { x:0, y:0, w:320, h:70 }, { x:0, y:226, w:320, h:14 },
+      { x:0, y:0, w:14, h:240 }, { x:306, y:0, w:14, h:240 }
+    ],
+    deco(){
+      diamondFloor(320, 240, "#1c2836", 18);
+      wallFace(0, 0, 320, 70, "#0c141e", "#1a2530");
+      // wall of screens
+      for (let sx = 30; sx < 290; sx += 52){
+        ctx.fillStyle = "#14141c"; ctx.fillRect(sx, 10, 44, 32);
+        ctx.fillStyle = G.flags.doughmerDone ? "#3a5878" : "#1c1c28";
+        ctx.fillRect(sx + 3, 13, 38, 26);
+        if (G.flags.doughmerDone){
+          ctx.fillStyle = "#f5d842"; ctx.fillRect(sx + 12, 22, 8, 10); ctx.fillRect(sx + 24, 20, 7, 12);
+        }
+      }
+      drawTextC("THE ARCHIVE VAULT", 160, 50, "#e040c0");
+      if (!G.flags.doughmerDone) drawSpr(doughmerSpr, 151, 84, {});
+      // the LOG OUT door
+      ctx.fillStyle = "#3c2a1c"; ctx.fillRect(280, 180, 22, 40);
+      ctx.fillStyle = G.flags.doughmerDone ? "#58c858" : "#e05858";
+      ctx.fillRect(286, 196, 8, 6);
+      drawTextC("LOG OUT", 291, 170, "#8a93a8");
+    },
+    npcs: [
+      { id:"doughboss", x:160, y:118, spr:null, w:26, h:14, sign:true, noDraw:true, hideFlag:"doughmerDone",
+        dlg(){ return preDoughmerScript(); } },
+      { id:"mrp2", x:200, y:150, spr:mrpSpr, w:12, h:14, solid:true, name:"MR. P", needFlag:"doughmerDone",
+        dlg(){
+          if (G.flags.doughmerSpared) return [
+            { p:"mrp", name:"MR. P", t:"SHHH. IT'S THE ONE WHERE THE DOG DOES SOMETHING. THEY'RE ALL THE ONE WHERE THE DOG DOES SOMETHING. PERFECT TELEVISION." }
+          ];
+          return [{ p:"mrp", name:"MR. P", t:"THE STREAM IS BACK. I WATCH ALONE NOW. IT'S... QUIETER THAN I DREAMED. THANK YOU ANYWAY." }];
+        } },
+      { id:"doughcouch", x:120, y:150, spr:doughmerSpr, w:16, h:14, solid:true, name:"DOUGHMER", needFlag:"doughmerSpared",
+        dlg(){ return [{ t:"DOUGHMER IS WATCHING THE SHOW WITH MR. P. HE PATS THE INVISIBLE COUCH BESIDE HIM. THERE IS NO ROOM. IT'S THE THOUGHT." }]; } },
+      { id:"logout", x:291, y:222, spr:null, w:16, h:12, sign:true, noDraw:true,
+        dlg(){
+          if (!G.flags.doughmerDone) return [{ t:"THE LOG OUT DOOR IS SEALED. THE ARCHIVE'S KEEPER STILL HOLDS EVERY SESSION HOSTAGE." }];
+          return logoutScript();
+        } }
+    ],
+    saves: [ { x:60, y:190 } ],
+    exits: [ { x:0, y:120, w:8, h:56, to:"codecrypt", tx:606, ty:110, dir:"left" } ],
+    spawns: []
+  }
+});
+function serverRack(x, y){
+  ctx.fillStyle = "#1c2630"; ctx.fillRect(x, y, 40, 80);
+  ctx.fillStyle = "#26323e"; ctx.fillRect(x + 3, y + 3, 34, 74);
+  for (let ry = y + 6; ry < y + 74; ry += 10){
+    ctx.fillStyle = "#14141c"; ctx.fillRect(x + 5, ry, 30, 7);
+    ctx.fillStyle = (Math.floor(G.t / 40) + ry) % 3 === 0 ? "#58c858" : "#1c4a2c";
+    ctx.fillRect(x + 7, ry + 2, 3, 3);
+    ctx.fillStyle = (Math.floor(G.t / 52) + ry) % 4 === 0 ? "#e05858" : "#4a1c1c";
+    ctx.fillRect(x + 13, ry + 2, 3, 3);
+  }
+}
+
+// ---- ch5 story scripts ----
+function ch5ArrivalScript(){
+  return [
+    { t:"YOU CLIMB OUT OF THE MANHOLE AND UP INTO... A BASEMENT? A COLD, HUMMING BASEMENT FULL OF BLINKING TOWERS." },
+    { p:"bmo", name:"BMO", t:"THIS IS A SERVER FARM. A HUGE ONE. WHY IS THERE A SERVER FARM BETWEEN THE SEWER AND THE STREET?" },
+    { p:"dorko", name:"DORKO", t:"WHY IS THERE ANYTHING UNDER ANYTHING. KEEP CLIMBING." },
+    { t:"AND THEN - THE LIGHTS TURN OFF." },
+    { p:"mega", name:"MEGAFIRE", t:"THAT'S THE THIRD LIGHTS-OUT AND THE THIRD FALL. I'M KEEPING A LIST. THE LIST IS FULL." },
+    { p:"bob", name:"BOB", t:"IS IT ALWAYS LIKE THIS WITH YOU FOUR-- THREE? WITH YOU THREE-PLUS-ME?" },
+    { t:"THE DARKNESS SMELLS LIKE HOT PLASTIC AND DEAD LINKS. A NEW DARK WORLD BOOTS UP AROUND YOU." }
+  ];
+}
+function preDoughmerScript(){
+  return [
+    { t:"A VAST YELLOW FIGURE STANDS BEFORE THE ARCHIVE WALL, SCROLLING THROUGH EVERY VIDEO EVER MADE. WATCHING NONE OF THEM." },
+    { t:"DOUGHMER: MMM... VISITORS. WAIT. *SNIFF* *SNIFF SNIFF* ...PIZZA ROLLS." },
+    { p:"dorko", name:"DORKO", t:"NO. NO, NO, NO. WE HAVE BEEN THROUGH FOUR WORLDS WITH THESE ROLLS. FOUR." },
+    { t:"DOUGHMER: ROLLS... THE CAUSE OF, AND SOLUTION TO, ALL OF MY PROBLEMS. GIMME." },
+    { p:"bob", name:"BOB", t:"PLUG YOUR EARS, NEW FRIENDS! WAIT. I'M IN THE PARTY NOW. SOMEONE ELSE PLUG MY EARS!" },
+    { fn(){ startBattle("doughmerFight", null); }, t:"DOUGHMER RISES LIKE DOUGH. WHICH IS TO SAY: SLOWLY, THEN ALL AT ONCE!" }
+  ];
+}
+function postDoughmerScript(){
+  if (G.flags.doughmerSpared){
+    return [
+      { t:"EVERY SCREEN IN THE VAULT LIGHTS UP AT ONCE. FORTY BILLION VIDEOS, BACK ONLINE." },
+      { t:"DOUGHMER AND MR. P SIT SIDE BY SIDE ON AN INVISIBLE COUCH, BATHED IN YELLOW GLOW." },
+      { p:"mrp", name:"MR. P", t:"SEASON FIVE, EPISODE ONE. GENTLEMEN... THANK YOU. MY MUSTACHE AND I ARE COMPLETE." },
+      { p:"bmo", name:"BMO", t:"WE RESTORED THE INTERNET'S ENTIRE VIDEO SUPPLY AND ALL ANYONE'S WATCHING IS A CARTOON FROM THE NINETIES. CORRECT CHOICE, HONESTLY." }
+    ];
+  }
+  return [
+    { t:"THE SCREENS FLICKER BACK TO LIFE, ONE BY ONE. FORTY BILLION VIDEOS, UNGUARDED AT LAST." },
+    { p:"mrp", name:"MR. P", t:"THE STREAM RETURNS... THOUGH THE VAULT FEELS EMPTIER THAN THE PROMISE OF SYNDICATION." },
+    { t:"MR. P TIPS HIS TOP HAT AT THE EMPTY SPOT WHERE A YELLOW MAN ONCE DROOLED." }
+  ];
+}
+function logoutScript(){
+  return [
+    { t:"THE LOG OUT DOOR GLOWS GREEN. BEYOND IT: STAIRS. REAL STAIRS. STREET-SHAPED LIGHT." },
+    { t:"LOG OUT AND GO HOME? FINAL ANSWER?", choices:[
+      { t:"LOG OUT", fn(){
+          say([
+            { p:"dorko", name:"DORKO", t:"FIVE DARK WORLDS. ONE FAMILY OF ROLLS. AND ONE NEW ROOMMATE. WE'RE DONE. FOR REAL. FOREVER. PROBABLY." },
+            { p:"mega", name:"MEGAFIRE", t:"IF ANYTHING ELSE GOES DARK IN OUR PRESENCE, I'M SIMPLY LYING DOWN WHEREVER I AM." },
+            { p:"bob", name:"BOB", t:"BEST FLUSH OF MY LIFE. ZERO STARS. WOULD BE FLUSHED AGAIN." },
+            { p:"bmo", name:"BMO", t:"ROLL CREDITS. FINAL PUN. I'M RETIRING IT. IT HAD A GOOD RUN. LIKE US." },
+            { t:"YOU CLIMB THE STAIRS INTO REAL SUNLIGHT, FOUR HEROES AND A BAG OF ROLLS THAT SAW FIVE WORLDS." }
+          ], () => {
+            G.flags.ch5Done = 1;
             G.flags.endRoute = endRoute();
             saveGame();
             stopMusic();
@@ -5705,7 +6312,7 @@ function ladderScript(){
             playJingle("victory");
           });
         } },
-      { t:"NOT YET", fn(){ say([{ p:"bob", name:"BOB", t:"TAKE YOUR TIME. I'VE WAITED WEEKS. I CAN WAIT FIVE MORE MINUTES. BARELY." }]); } }
+      { t:"NOT YET", fn(){ say([{ p:"bob", name:"BOB", t:"SURE! ONE MORE LAP! I LOVE LAPS! I'VE NEVER HAD FRIENDS TO LAP WITH!" }]); } }
     ] }
   ];
 }
@@ -5980,53 +6587,61 @@ function drawEnd(){
             : route === "violent" ? ["THE COLD ENDING", "#9fd8f0"]
             : ["THE SNACK ENDING", "#ffe14a"];
   drawTextC(sub[0], 160, 36, sub[1]);
-  if (G.flags.ch4Done) drawTextC("CHAPTERS 1 + 2 + 3 + 4 COMPLETE", 160, 46, "#e040c0");
+  if (G.flags.ch5Done) drawTextC("ALL FIVE CHAPTERS COMPLETE", 160, 46, "#e040c0");
+  else if (G.flags.ch4Done) drawTextC("CHAPTERS 1 + 2 + 3 + 4 COMPLETE", 160, 46, "#e040c0");
   else if (G.flags.ch3Done) drawTextC("CHAPTERS 1 + 2 + 3 COMPLETE", 160, 46, "#e040c0");
   else if (G.flags.ch2Done) drawTextC("CHAPTERS 1 + 2 COMPLETE", 160, 46, "#e040c0");
-  // everyone you kept takes a bow
-  const lineup = [dorkoFront, megaFront, bmoFront];
+  // the party bows up front; everyone you kept bows behind
+  const partyRow = [dorkoFront, megaFront, bmoFront];
+  if (G.flags.ch4Done) partyRow.push(bobSpr);
+  const friends = [];
   if (route === "pacifist"){
-    lineup.push(gherkinSpr, eggbertSpr, onionSpr, kongySpr, glacionSpr);
-    if (G.flags.secretSpared) lineup.push(chipsSpr);
+    friends.push(gherkinSpr, eggbertSpr, onionSpr, kongySpr, glacionSpr);
+    if (G.flags.secretSpared) friends.push(chipsSpr);
   } else if (route === "neutral"){
-    if (G.flags.kongySpared) lineup.push(kongySpr);
-    if (G.flags.bossSpared) lineup.push(glacionSpr);
-    if (G.flags.secretSpared) lineup.push(chipsSpr);
+    if (G.flags.kongySpared) friends.push(kongySpr);
+    if (G.flags.bossSpared) friends.push(glacionSpr);
+    if (G.flags.secretSpared) friends.push(chipsSpr);
   }
   if (G.flags.ch2Done){
-    lineup.push(syxSpr);
-    if (G.flags.ballpitSpared && route !== "violent") lineup.push(congoerSpr);
+    friends.push(syxSpr);
+    if (G.flags.ballpitSpared && route !== "violent") friends.push(congoerSpr);
   }
   if (G.flags.ch3Done){
-    lineup.push(mgSpr);
-    if (G.flags.rollySpared && route !== "violent") lineup.push(rollySpr);
+    friends.push(mgSpr);
+    if (G.flags.rollySpared && route !== "violent") friends.push(rollySpr);
   }
-  if (G.flags.ch4Done){
-    lineup.push(bobSpr);
-    if (G.flags.gatorSpared && route !== "violent") lineup.push(gatorSpr);
+  if (G.flags.ch4Done && G.flags.gatorSpared && route !== "violent") friends.push(gatorSpr);
+  if (G.flags.ch5Done){
+    friends.push(mrpSpr);
+    if (G.flags.doughmerSpared && route !== "violent") friends.push(doughmerSpr);
   }
-  const gap = lineup.length > 12 ? 2 : lineup.length > 10 ? 3 : 6;
-  const totalW = lineup.reduce((a, s) => a + s.width, 0) + gap * (lineup.length - 1);
-  let lx = 160 - totalW / 2;
-  lineup.forEach((s, i) => {
-    const yo = Math.sin(G.t / 18 + i * 0.9) * 2;
-    drawSpr(s, lx, 96 - s.height + yo, {});
-    lx += s.width + gap;
-  });
-  const flavor = route === "pacifist" ? "EVERY SNACK IN THE FRIDGE CALLS YOU FRIEND."
-              : route === "violent" ? "IT'S QUIET. JUST THE THREE OF YOU, AND THE HUM."
+  const drawRow = (row, baseY) => {
+    const gap = row.length > 12 ? 2 : row.length > 9 ? 3 : 6;
+    const totalW = row.reduce((a, s) => a + s.width, 0) + gap * (row.length - 1);
+    let lx = 160 - totalW / 2;
+    row.forEach((s, i) => {
+      const yo = Math.sin(G.t / 18 + i * 0.9) * 2;
+      drawSpr(s, lx, baseY - s.height + yo, {});
+      lx += s.width + gap;
+    });
+  };
+  drawRow(partyRow, 78);
+  if (friends.length) drawRow(friends, 106);
+  const flavor = route === "pacifist" ? "EVERY SNACK YOU EVER MET CALLS YOU FRIEND."
+              : route === "violent" ? "IT'S QUIET. JUST YOUR PARTY, AND THE HUM."
               : "SOME FRIENDS, SOME FOES, ALL FED.";
-  drawTextC(flavor, 160, 110, "#c9c9d8");
+  drawTextC(flavor, 160, 114, "#c9c9d8");
   drawTextC(`SNACKS BEFRIENDED: ${G.spares}   SNACKS DEFEATED: ${G.kills}`, 160, 128, "#8a93a8");
   drawTextC(`FINAL LV ${G.lv} - CRUMBS ${G.crumbs}`, 160, 140, "#8a93a8");
   if (route === "pacifist") drawTextC("CLEANEST HANDS IN THE CRISPER!", 160, 154, "#58c858");
   if (route === "violent") drawTextC("THE FRIDGE REMEMBERS.", 160, 154, "#9fd8f0");
   if (G.flags.secretDone)
     drawTextC(G.flags.secretSpared ? "CRISPUS KNOWS WHERE HE LIVES NOW." : "THE TOP SHELF IS SILENT.", 160, 166, "#e8a030");
-  drawTextC("THE MYTHICAL PIZZA ROLLS WERE REAL.", 160, 184, "#5a6078");
-  drawTextC("THANKS FOR PLAYING!", 160, 196, "#5a6078");
+  drawTextC("THE MYTHICAL PIZZA ROLLS WERE REAL.", 160, 182, "#5a6078");
+  drawTextC("THANKS FOR PLAYING!", 160, 194, "#5a6078");
   if (G.endTimer > 90 && (G.t >> 4) % 2 === 0)
-    drawTextC("PRESS Z", 160, 212, "#ffe14a");
+    drawTextC("PRESS Z", 160, 210, "#ffe14a");
 }
 
 // ================= MAIN LOOP =================
