@@ -2255,7 +2255,8 @@ function drawWorld(){
   items.sort((a, b) => a.y - b.y).forEach(it => it.draw());
   ctx.restore();
 
-  if (room.dark){
+  const roomDark = typeof room.dark === "function" ? room.dark() : room.dark;
+  if (roomDark){
     const g = darkOverlay.getContext("2d");
     g.clearRect(0, 0, W, H);
     g.fillStyle = "rgba(8,12,42,0.55)"; g.fillRect(0, 0, W, H);
@@ -2559,13 +2560,13 @@ function startBattle(groupId, flag){
     bullets:[], fx:[], dmgNums:[],
     fightX:0, fightDone:false, fightTargets:[],
     phaseT:0, phaseLen:400, slowNext:1, curSlow:1,
-    bossPhase:1, bossDlgQueue:[], canFlee: !(groupId === "tut" || groupId === "boss" || groupId === "kongyFight" || groupId === "secret" || groupId === "ballpitFight" || groupId === "rollyFight"),
+    bossPhase:1, bossDlgQueue:[], canFlee: !(groupId === "tut" || groupId === "boss" || groupId === "kongyFight" || groupId === "secret" || groupId === "ballpitFight" || groupId === "rollyFight" || groupId === "gatorFight"),
     tutorial: groupId === "tut", tutHintT:0,
     rewardExp:0, rewardCrumbs:0, endFlavor:""
   };
   G.mode = "battle";
   SFX.encounter();
-  playMusic(groupId === "boss" || groupId === "secret" || groupId === "ballpitFight" || groupId === "rollyFight" ? "boss" : "battle");
+  playMusic(groupId === "boss" || groupId === "secret" || groupId === "ballpitFight" || groupId === "rollyFight" || groupId === "gatorFight" ? "boss" : "battle");
   B.msg = B.tutorial ? "A WILD GHERKIN JIGGLES INTO YOUR PATH!"
         : groupId === "boss" ? "KING GLACION DESCENDS FROM HIS FROSTBITTEN THRONE!"
         : groupId === "kongyFight" ? "KONGY GORGONZOLA BEATS HIS MAGNIFICENT CHEST!"
@@ -2574,6 +2575,8 @@ function startBattle(groupId, flag){
         : groupId === "rollyFight" ? "ROLLY VAULTS ACROSS THE BOARDROOM TABLE, GLOVES UP!"
         : groupId === "band" ? "THE QUARTERLY EARNINGS COUNT OFF: ONE! TWO! ONE-TWO-THREE-FOUR!"
         : groupId === "comics" ? "SEVEN ISSUES OF PURE RESENTMENT TAKE WING!"
+        : groupId === "gatorFight" ? "SNAPJAW EXPLODES OUT OF THE POOL, JAWS FIRST!"
+        : G.flags.ch4 ? pick(["SOMETHING RUSTLES IN THE MUCK!", "THE PIPES GURGLE A WARNING!", "IT SMELLS LIKE TROUBLE. AND WORSE."])
         : G.flags.ch3 ? pick(["THE DISCO BALL SPINS FASTER!", "SOMETHING FUNKY THIS WAY COMES!", "THE BEAT DROPS. SO DOES THE TEMPERATURE."])
         : G.flags.ch2 ? pick(["THE DARK CON HUMS WITH STATIC!", "A CHALLENGER LOOMS BETWEEN THE BOOTHS!", "IT SMELLS LIKE ENERGY DRINKS AND MENACE."])
         : pick(["THE COLD AIR CRACKLES!", "SNACKS APPROACH WITH INTENT!", "IT SMELLS LIKE TROUBLE. AND FOOD."]);
@@ -2621,6 +2624,7 @@ function hurtEnemy(e, dmg){
   if (e.defId === "chips") checkChipsPhase(e);
   if (e.defId === "ballpit") checkBallpitPhase(e);
   if (e.defId === "rolly") checkRollyPhase(e);
+  if (e.defId === "gator") checkGatorPhase(e);
 }
 function checkChipsPhase(e){
   if (!e.phase2 && e.alive && e.hp <= e.maxhp / 2){
@@ -2928,6 +2932,7 @@ function endCharAction(){
 }
 function advanceTurnFlow(){
   if (B.afterMsg === "end" || battleWon()){ startVictory(); return; }
+  if (B.afterMsg === "bobdone"){ B.afterMsg = ""; startEnemyTurn(); return; }
   const ni = nextChar(B.ci + 1);
   if (ni === -1){ startEnemyTurn(); }
   else { B.ci = ni; setState("menu"); B.msg = defaultMsg(); }
@@ -2964,6 +2969,20 @@ function startVictory(){
   setState("victory");
 }
 function startEnemyTurn(){
+  // Bob fights alongside the party against the gator: one blast per round
+  if (B.groupId === "gatorFight" && B.bobTurn !== B.turn){
+    B.bobTurn = B.turn;
+    const e = aliveEnemies()[0];
+    if (e){
+      SFX.boom(); shake(4, 10);
+      hurtEnemy(e, 22 + e.def);
+      if (battleWon()){ setState("msg"); B.msg = "BOB LOBS HIMSELF AT SNAPJAW AND DETONATES!!"; B.afterMsg = "end"; return; }
+      B.msg = "BOB LOBS HIMSELF AT SNAPJAW AND DETONATES!! HE REASSEMBLES INSTANTLY, DELIGHTED.";
+      setState("msg");
+      B.afterMsg = "bobdone";
+      return;
+    }
+  }
   // boss scripted dialogue first if queued (drain fully, in order)
   if (B.bossDlgQueue.length){
     const script = B.bossDlgQueue.shift();
@@ -2989,6 +3008,13 @@ function enemyBubble(){
       3: ["NOBODY STAYS...", "I JUST WANTED A FULL PIT...", "ONE MORE GUEST. JUST ONE. FOREVER."]
     }[B.bossPhase];
     B.bubble = { text: lines[B.turn % lines.length], e };
+  } else if (e.defId === "gator"){
+    const lines = {
+      1: ["ROLLS. GIVE. NOW.", "I CAN SMELL THE MARINARA FROM HERE.", "*ENORMOUS JAW SOUNDS*"],
+      2: ["I'VE EATEN A LADDER. YOU THINK I FEAR YOU?", "THE SEWER PROVIDES. SLOWLY. COLDLY.", "GIVE. THE. ROLLS."],
+      3: ["ONE WARM THING. THAT'S ALL I WANTED.", "EVERYTHING DOWN HERE IS ALREADY EATEN...", "...IS THAT BELLY RUB STILL ON THE TABLE?"]
+    }[B.bossPhase];
+    B.bubble = { text: lines[B.turn % lines.length], e };
   } else if (e.defId === "rolly"){
     const lines = {
       1: ["HAVE YOU TRIED OUR NEW RANCH VARIANT?", "SMILES ARE MANDATORY. MINE IS PAINTED ON.", "BRAND LOYALTY IS FOREVER."],
@@ -3009,7 +3035,7 @@ function startBullets(){
   B.bullets = [];
   B.soul.x = B.box.x + B.box.w / 2; B.soul.y = B.box.y + B.box.h / 2; B.soul.inv = 0;
   B.phaseT = 0;
-  B.phaseLen = (B.groupId === "boss" || B.groupId === "ballpitFight" || B.groupId === "rollyFight") ? 430 + B.bossPhase * 30 : B.groupId === "secret" ? 430 : 380;
+  B.phaseLen = (B.groupId === "boss" || B.groupId === "ballpitFight" || B.groupId === "rollyFight" || B.groupId === "gatorFight") ? 430 + B.bossPhase * 30 : B.groupId === "secret" ? 430 : 380;
   B.curSlow = B.slowNext; B.slowNext = 1;
   B.tutHintT = B.tutorial ? 240 : 0;
   setState("bullets");
@@ -3096,7 +3122,7 @@ function applyPartyDamage(dmg){
 function runPattern(e){
   const t = B.phaseT, box = B.box;
   const pat = e.pattern === "boss" ? null : e.pattern;
-  const spdMul = (e.soft ? 0.75 : 1) * ((B.groupId === "boss" || B.groupId === "ballpitFight" || B.groupId === "rollyFight") ? 1 + (B.bossPhase - 1) * 0.18 : 1);
+  const spdMul = (e.soft ? 0.75 : 1) * ((B.groupId === "boss" || B.groupId === "ballpitFight" || B.groupId === "rollyFight" || B.groupId === "gatorFight") ? 1 + (B.bossPhase - 1) * 0.18 : 1);
   if (e.pattern === "boss"){ bossPattern(e, t, spdMul); return; }
   if (e.pattern === "ballpit"){ ballpitPattern(e, t, spdMul); return; }
   if (e.pattern === "rolly"){ rollyPattern(e, t, spdMul); return; }
@@ -3212,6 +3238,7 @@ function finishBattle(won){
   if (won && gid === "boss"){ G.flags.bossDone = true; G.flags.bossSpared = allSpared; }
   if (won && gid === "ballpitFight"){ G.flags.ballpitDone = true; G.flags.ballpitSpared = allSpared; }
   if (won && gid === "rollyFight"){ G.flags.rollyDone = true; G.flags.rollySpared = allSpared; }
+  if (won && gid === "gatorFight"){ G.flags.gatorDone = true; G.flags.gatorSpared = allSpared; }
   if (won && gid === "kongyFight") G.flags.kongySpared = allSpared;
   if (won && gid === "secret") G.flags.secretSpared = allSpared;
   if (won && gid === "comics") G.flags.comicsSpared = allSpared;
@@ -3224,7 +3251,8 @@ function finishBattle(won){
     boss:         { script: () => postBossScript(),    done: () => G.flags.gotRolls },
     ballpitFight: { script: () => postBallpitScript(), done: () => G.flags.ch2Done },
     comics:       { script: () => postComicsScript(),  done: () => G.flags.boardroomOpen },
-    rollyFight:   { script: () => postRollyScript(),   done: () => G.flags.ch3Done }
+    rollyFight:   { script: () => postRollyScript(),   done: () => G.flags.ch3Done },
+    gatorFight:   { script: () => postGatorScript(),   done: () => G.flags.ch4Done }
   };
   const pm = postMap[gid];
   if (won && pm){
@@ -3762,7 +3790,11 @@ function updateDrive(){
   d.t++;
   if (d.iv > 0) d.iv--;
   if (G.shake > 0) G.shake--;
-  if (d.arrived){ if (G.dialog) updateDialog(); return; }
+  if (d.arrived){
+    if (d.blackout && (d.bt || 0) < 30) d.bt = (d.bt || 0) + 1;
+    if (G.dialog) updateDialog();
+    return;
+  }
   const spd = 2.4;
   if (held.left) d.x -= spd; if (held.right) d.x += spd;
   if (held.up) d.y -= 1.6; if (held.down) d.y += 1.6;
@@ -3788,11 +3820,15 @@ function updateDrive(){
     d.arrived = true;
     SFX.confirm();
     stopMusic();
-    say(arrivalScript(), () => {
-      G.flags.ch2 = 1;
-      enterRoom("conlobby", 60, 150, true);
-      G.mode = "world";
-      saveGame();
+    say(arrivalPart1(), () => {
+      tone(400, 0.7, "sawtooth", 0.25, 40); // the power dies
+      d.blackout = true;
+      say(arrivalPart2(), () => {
+        G.flags.ch2 = 1;
+        enterRoom("conlobby", 60, 150, true);
+        G.mode = "world";
+        saveGame();
+      });
     });
   }
 }
@@ -3846,17 +3882,25 @@ function drawDrive(){
   ctx.fillStyle = "#3a3f52"; ctx.fillRect(140, 14, 110, 8);
   ctx.fillStyle = "#58c858"; ctx.fillRect(140, 14, Math.round(110 * d.prog / 100), 8);
   drawTextC("ARROWS: STEER   GRAB ROLLS, DODGE THE REST", 160, 228, "#5a6078");
+  if (d.blackout){
+    ctx.fillStyle = `rgba(2,3,6,${Math.min(1, (d.bt || 0) / 30)})`;
+    ctx.fillRect(0, 0, W, H);
+  }
   ctx.restore();
   drawDialog();
 }
-function arrivalScript(){
+function arrivalPart1(){
   return [
     { t:"YOU ARRIVE AT THE CONVENTION CENTER. THE LINE WRAPS AROUND THE BLOCK. TWICE." },
     { p:"bmo", name:"BMO", t:"RELAX. WE'RE WITH THE BAND." },
     { p:"dorko", name:"DORKO", t:"WE ARE?" },
     { p:"bmo", name:"BMO", t:"WE ARE IF WE WALK FAST." },
     { t:"INSIDE: A THOUSAND BOOTHS. A MILLION LANYARDS. THE SMELL OF ENERGY DRINKS AND DESTINY." },
-    { t:"THEN - EVERY LIGHT DIES AT ONCE. EVEN THE EXIT SIGNS. ESPECIALLY THE EXIT SIGNS." },
+    { t:"THEN - EVERY LIGHT DIES AT ONCE. EVEN THE EXIT SIGNS. ESPECIALLY THE EXIT SIGNS." }
+  ];
+}
+function arrivalPart2(){
+  return [
     { p:"mega", name:"MEGAFIRE", t:"NO. NO NO NO. I KNOW THIS FEELING. THIS IS A FRIDGE FEELING." },
     { t:"THE DARKNESS TASTES LIKE STATIC AND CHERRY SLUSHIE. A NEW DARK WORLD SWALLOWS THE CON WHOLE." }
   ];
@@ -4194,7 +4238,7 @@ Object.assign(ROOMS, {
     spawns: []
   },
   ballpit: {
-    w: 320, h: 240, music: "con", dark: true,
+    w: 320, h: 240, music: "con", dark: () => !G.flags.ballpitDone,
     floor: "#160e2c",
     walls: [
       { x:0, y:0, w:320, h:70 }, { x:0, y:226, w:320, h:14 },
@@ -4421,39 +4465,42 @@ function goHomeScript(){
 
 // ---- sprites ----
 const mgPal = { H:"#58c858", D:"#2e8f3c", g:"#9aa2b8", G:"#6a7288", C:"#4a5a8c", k:"#14141c", w:"#ffffff" };
+// MG: thin bare worm-like head, armor over everything else (legs included)
 const mgSpr = S([
-"....HHHHHH......",
+"......gggg......",
+"......gggg......",
+"......kggk......",
+"......gggg......",
+"......gkkg......",
+"......gggg......",
+"....HHHHHHHH....",
+"...HHHHHHHHHH...",
+"..HHDDDDDDDDHH..",
+"..HHHHHHHHHH.CC.",
+"..HHDDDDDDHH.CCC",
+"..HHHHHHHHHH.CC.",
 "...HHHHHHHH.....",
-"..HHDDDDDDHH....",
-"..HDHHHHHHDH....",
-"..gggggggggg....",
-".ggkkggggkkgg...",
-".gggggggggggg...",
-"..ggggkkgggg....",
-"..HHHHHHHHHH....",
-".HHHHHHHHHH.CC..",
-".HHDDDDDDHH.CCC.",
-"g.gggggggg..CCC.",
-"g.gGGGGGGg...C..",
-".ggg....ggg.....",
-".DDg....gDD.....",
+"...HHH..HHH.....",
+"...HHH..HHH.....",
+"..DDHH..HHDD....",
 ], mgPal);
 const mgPort = S([
-"......HHHHHHHHHH........",
-"....HHHHHHHHHHHHHH......",
-"...HHDDDDDDDDDDDDHH.....",
-"...HDHHHHHHHHHHHHDH.....",
-"...HHHHHHHHHHHHHHHH.....",
-"..gggggggggggggggggg....",
-"..ggkkkkggggggkkkkgg....",
-"..ggkkkkggggggkkkkgg....",
-"..gggggggggggggggggg....",
-"..gggggggggggggggggg....",
-"..ggggggkkkkkkgggggg....",
-"..gggggkggggggkggggg....",
-"..gggggggggggggggggg....",
-"...HHHHHHHHHHHHHHHH.....",
-"...HHHDDDDDDDDDDHHH.....",
+".........gggggg.........",
+"........gggggggg........",
+"........gggggggg........",
+"......ggkkggggkkgg......",
+"......ggkkggggkkgg......",
+"........gggggggg........",
+"........gggggggg........",
+"........ggkkkkgg........",
+"........gggggggg........",
+".........gggggg.........",
+".......HHHHHHHHHH.......",
+".....HHHHHHHHHHHHHH.....",
+"....HHHDDDDDDDDDDHHH....",
+"....HHHHHHHHHHHHHHHH....",
+"...HHHHHDDDDDDDDHHHHH...",
+"...HHHHHHHHHHHHHHHHHH...",
 "........................",
 ], mgPal);
 PORTRAITS.mg = mgPort;
@@ -4753,10 +4800,13 @@ Object.assign(ROOMS, {
     },
     npcs: [
       { id:"deskbell", x:160, y:102, spr:null, w:16, h:10, sign:true, noDraw:true,
-        dlg(){ return [
-          { t:"YOU RING THE RECEPTION BELL. IT PLAYS A FUNKY LITTLE LICK INSTEAD OF A DING." },
-          { p:"dorko", name:"DORKO", t:"EVEN THE BELL HAS GONE DISCO. STAY SHARP." }
-        ]; } }
+        dlg(){
+          [523, 659, 587, 784, 659].forEach((f, i) => tone(f, 0.09, "square", 0.16, 0, i * 0.09));
+          return [
+            { t:"YOU RING THE RECEPTION BELL. IT PLAYS A FUNKY LITTLE LICK INSTEAD OF A DING." },
+            { p:"dorko", name:"DORKO", t:"EVEN THE BELL HAS GONE DISCO. STAY SHARP." }
+          ];
+        } }
     ],
     saves: [ { x:60, y:190 } ],
     exits: [ { x:312, y:120, w:8, h:56, to:"discobar", tx:26, ty:150, dir:"right" } ],
@@ -4960,7 +5010,7 @@ Object.assign(ROOMS, {
     spawns: []
   },
   boardroom: {
-    w: 320, h: 240, music: "disco", dark: true,
+    w: 320, h: 240, music: "disco", dark: () => !G.flags.rollyDone,
     floor: "#241428",
     walls: [
       { x:0, y:0, w:320, h:70 }, { x:0, y:226, w:320, h:14 },
@@ -5028,19 +5078,24 @@ function ransackedScript(){
     { t:"DORKO SILENTLY GRABS EVERYONE BY THE ARM." },
     { p:"dorko", name:"DORKO", t:"CAR. NOW.",
       fn(){
+        // actually leave the house: cut to black, arrive at HQ, then reveal the dark lobby
         SFX.encounter();
+        enterRoom("discolobby", 60, 150, true);
+        stopMusic();
+        G.fade.a = 1; G.fade.dir = 0; G.fade.cb = null;
         say([
           { t:"ONE FURIOUS DRIVE LATER: PIZZA ROLL CORPORATION WORLD HEADQUARTERS. FLOOR 1 OF 44." },
           { t:"DORKO KICKS THE REVOLVING DOOR. IT REVOLVES. HE ENTERS ANYWAY, DRAMATICALLY." },
           { t:"AND THEN - THE LIGHTS TURN OFF." },
           { p:"mega", name:"MEGAFIRE", t:"OH COME ON. THREE TIMES?! WHO KEEPS DOING THIS?!" },
-          { t:"THE DARKNESS SMELLS LIKE FOG MACHINE AND QUARTERLY REPORTS. SOMEWHERE, A BASSLINE BEGINS.",
-            fn(){
-              G.flags.ch3 = 1;
-              enterRoom("discolobby", 60, 150, true);
-              saveGame();
-            } }
-        ]);
+          { t:"THE DARKNESS SMELLS LIKE FOG MACHINE AND QUARTERLY REPORTS. SOMEWHERE, A BASSLINE BEGINS." }
+        ], () => {
+          G.flags.ch3 = 1;
+          [43, 43, 50].forEach((m, i) => tone(freqOf(m), 0.22, "triangle", 0.3, 0, i * 0.24));
+          playMusic("disco");
+          G.fade.dir = -1;
+          saveGame();
+        });
       } }
   ];
 }
@@ -5087,15 +5142,562 @@ function postComicsScript(){
 function finalHomeScript(){
   return [
     { t:"THE BOARDROOM IS QUIET. THE CRATE OF ROLLS SITS ON THE TABLE, WARM SOMEHOW." },
-    { t:"TAKE THE ROLLS AND GO HOME? FOR REAL THIS TIME?", choices:[
-      { t:"GO HOME", fn(){
+    { t:"TAKE THE ROLLS AND HEAD OUT?", choices:[
+      { t:"HEAD OUT", fn(){
           say([
             { p:"dorko", name:"DORKO", t:"THREE DARK WORLDS. ONE FAMILY OF ROLLS. WE'RE DONE. WE'RE ACTUALLY DONE." },
-            { p:"mega", name:"MEGAFIRE", t:"I'M GOING TO SLEEP FOR A WEEK. THEN I'M VISITING EVERYONE. THE FRIDGE. THE PIT. EVEN THE STAPLER." },
-            { p:"bmo", name:"BMO", t:"CREDITS. ROLL THEM. I'VE EARNED THIS PUN THREE TIMES OVER." },
-            { t:"YOU DRIVE HOME IN THE MORNING LIGHT, ROLLS ON EVERY LAP. THE HOUSE IS A MESS. IT'S YOURS. IT'S PERFECT." }
+            { t:"YOU STEP OUT OF THE LOBBY INTO THE MORNING AIR, ROLLS IN HAND. VICTORY. SUNRISE. FREEDOM." },
+            { p:"bmo", name:"BMO", t:"WATCH THE-" }
           ], () => {
             G.flags.ch3Done = 1;
+            SFX.fall();
+            noiseHit(0.45, 0.4, 0.6, 0.7); // the splash
+            enterRoom("sewerfall", 60, 150, true);
+            G.flags.ch4 = 1;
+            saveGame();
+            say([
+              { t:"-MANHOLE." },
+              { t:"SPLOOSH." },
+              { p:"mega", name:"MEGAFIRE", t:"I HAVE WATER IN PLACES I DIDN'T KNOW I HAD. WHERE ARE WE?" },
+              { p:"bmo", name:"BMO", t:"THE SEWER. CHAPTER FOUR. AT THIS POINT I'M NOT EVEN SURPRISED. JUST IMPRESSED." },
+              { p:"dorko", name:"DORKO", t:"ROLLS: SAFE. PRIDE: DAMP. ONWARD AND, IDEALLY, UPWARD." }
+            ]);
+          });
+        } },
+      { t:"NOT YET", fn(){ say([{ p:"bmo", name:"BMO", t:"SURE. ONE MORE LAP AROUND THE DISCO. FOR THE ROAD." }]); } }
+    ] }
+  ];
+}
+// ================= CHAPTER 4: THE SEWER =================
+
+// ---- sprites ----
+const bobPal = { B:"#3858c8", D:"#24409c", k:"#14141c", y:"#ffe14a", w:"#ffffff", O:"#e8a030", s:"#8a93a8" };
+const bobSpr = S([
+".....kk.....",
+"....kk.y....",
+"...BBBBBB...",
+"..BBBBBBBB..",
+".BBwwBBwwBB.",
+".BBwkBBwkBBs",
+".BBBBBBBBBBs",
+".BBBBBBBBBs.",
+"..BDDBBDDB..",
+"...BBBBBB...",
+"..OO....OO..",
+"..OO....OO..",
+], bobPal);
+const bobPort = S([
+"..........kkkk..........",
+".........kk..yy.........",
+".......BBBBBBBB.........",
+".....BBBBBBBBBBBB.......",
+"....BBBBBBBBBBBBBB......",
+"...BBwwwwBBBBwwwwBB.....",
+"...BBwwkkBBBBwwkkBB.....",
+"...BBwwkkBBBBwwkkBB.....",
+"...BBBBBBBBBBBBBBBB.....",
+"...BBBBBBBBBBBBBBBB.....",
+"...BBBBBkkkkkkBBBBB.....",
+"....BBBBBBBBBBBBBB......",
+".....BBDDDDDDDDBB.......",
+".......BBBBBBBB.........",
+"........................",
+], bobPal);
+PORTRAITS.bob = bobPort;
+VOICES.bob = 360;
+const gatorSpr = S([
+"..........gg..gg................",
+".........gwkggwkg...............",
+"....gggggggggggggggggggg........",
+"..gggggggggggggggggggggggg......",
+".gDgDgDgDgDgDgDgDgDgDgggggg.....",
+"gggggggggggggggggggggggggggg....",
+"gwwwwwwwwwwwgggggggggggggggg....",
+"g.w.w.w.w.wggggggggggggggggggg..",
+"gggggggggggggggggggggggggDgg....",
+".ggggggggggggggggggggggDggg.....",
+"..gggg..gggg..gggg..ggggg.......",
+"..gggg..gggg..gggg..ggg.........",
+], { g:"#4a8f3c", D:"#2e6b28", w:"#ffffff", k:"#14141c" });
+const ratSpr = S([
+".kk....kk.",
+".kgggggk..",
+".gggggggg.",
+".gkgggkgg.",
+".gggggggg.",
+"..gggggg.s",
+".gggggggss",
+"..gg..gg..",
+], { k:"#3a3f52", g:"#8a93a8", s:"#c9a05c" });
+const ratKingSpr = S([
+".y.yy.y...",
+".yyyyyy...",
+".kk....kk.",
+".kgggggk..",
+".gggggggg.",
+".gkgggkgg.",
+".gggggggg.",
+"..gggggg.s",
+".gggggggss",
+"..gg..gg..",
+], { y:"#ffe14a", k:"#3a3f52", g:"#8a93a8", s:"#c9a05c" });
+function makeTurtle(mask){
+  return S([
+"...ggggg...",
+"..ggggggg..",
+".mmkmmmkmm.",
+"..ggggggg..",
+"..ggggggg..",
+"..yyyyyyy..",
+".gyyyyyyyg.",
+"..yyyyyyy..",
+"..gg...gg..",
+"..gg...gg..",
+  ], { g:"#4a8f3c", m:mask, y:"#e8c25c", k:"#14141c" });
+}
+const turtleRed = makeTurtle("#e05858"), turtleBlue = makeTurtle("#5878e0"),
+      turtleOrange = makeTurtle("#e8a030"), turtlePurple = makeTurtle("#8a4ad8");
+const trashSpr = S([
+".....kk.....",
+"....kBBk....",
+"...BBBBBB...",
+"..BBBBBBBB..",
+".BBwkBBwkBB.",
+".BBBBBBBBBB.",
+".BBBkkkkBBB.",
+".BBBBBBBBBB.",
+".BBBBBBBBBB.",
+"..BBBBBBBB..",
+"..BBBBBBBB..",
+".BBBBBBBBBB.",
+], { k:"#14141c", B:"#3a4152", w:"#ffffff" });
+const bananaSpr = S([
+"....kk......",
+"...yyky.....",
+"..yyyyyy....",
+".yy.yy.yy...",
+".yywkywkyy..",
+"yy..yy..yy..",
+"yy..yy...yy.",
+"y...yy....y.",
+], { k:"#5c4a2e", y:"#ffe14a", w:"#ffffff" });
+
+// ---- ch4 music: sewer dub ----
+Object.assign(SONGS, {
+  sewer: {
+    bpm: 84, tracks: [
+      { wave: "triangle", vol: 0.20, seq:
+        "E3 ~  ~  ~  G3 ~  E3 ~  A3 ~  ~  ~  G3 ~  E3 ~  D3 ~  ~  ~  E3 ~  G3 ~  E3 ~  ~  ~  ~  ~  ~  ~" },
+      { wave: "square", vol: 0.04, seq:
+        ".  .  .  B4 .  .  .  .  .  .  E5 .  .  .  .  .  .  .  .  G4 .  .  .  .  .  .  B4 .  .  E4 .  ." },
+      { wave: "triangle", vol: 0.26, seq:
+        "E2 ~  .  E2 ~  .  G1 ~  A1 ~  .  A1 ~  .  G1 ~  D2 ~  .  D2 ~  .  A1 ~  E2 ~  .  B1 ~  E2 ~  ~" },
+    ],
+    noise: ". . h . k . . . . . h . k . . h . . h . k . . . . . h . k . h ."
+  }
+});
+
+// ---- ch4 items ----
+Object.assign(ITEMS, {
+  sandwich: { name:"MYSTERY SANDWICH", heal:65, desc:"FOUND SEALED. PROBABLY FINE. 65 HP." },
+  glowsoda: { name:"GLOW SODA",        heal:40, tp:20, desc:"IT GLOWS. YOU'LL GLOW. 40 HP, 20% TP." }
+});
+const RAT_STOCK = [ ["glowsoda", 20], ["sandwich", 35], ["conpizza", 45] ];
+function ratShop(){
+  const choices = RAT_STOCK.map(([id, price]) => ({
+    t: `${ITEMS[id].name.split(" ")[0]} ${price}`,
+    fn(){
+      if (G.crumbs < price){ say([{ t:"THE MERCHANT RAT SNIFFS YOUR POCKETS AND SHAKES HIS HEAD SADLY.", fn: ratShop }]); return; }
+      if (G.inv.length >= 8){ say([{ t:"'POCKETS FULL, SURFACE FRIEND. THE SEWER TEACHES US TO CARRY LESS.'", fn: ratShop }]); return; }
+      G.crumbs -= price; G.inv.push(id); SFX.confirm();
+      say([{ t:`THE MERCHANT RAT WRAPS YOUR ${ITEMS[id].name} IN A LEAF. CLASSY.`, fn: ratShop }]);
+    }
+  }));
+  choices.push({ t:"LEAVE", fn(){ say([{ t:"'MAY YOUR WHISKERS STAY DRY.' IT'S A BLESSING DOWN HERE." }]); } });
+  say([{ t:`THE MERCHANT RAT SPREADS HIS WARES ON A BOTTLE CAP. (YOU HAVE ${G.crumbs} CRUMBS)`, choices }]);
+}
+
+// ---- ch4 enemies ----
+Object.assign(ENEMY_DEFS, {
+  trashbag: {
+    name:"GARBO", spr:trashSpr, hp:95, atk:8, def:2, exp:36, crumbs:32, pattern:"lob",
+    check:"GARBO - ATK 8 DEF 2. A BAG OF GARBAGE THAT ACHIEVED CONSCIOUSNESS AND IMMEDIATELY REGRETTED IT.",
+    quotes:["I CONTAIN MULTITUDES. MOSTLY EGGSHELLS.","NOBODY SORTS ANYMORE. NOBODY CARES.","ONE MAN'S TRASH IS... ALSO ME.","RUSTLE RUSTLE."],
+    acts:[
+      { t:"SORT RECYCLING", fn(e){ e.sorted = true; return "YOU SORT GARBO'S CONTENTS: PAPER, PLASTIC, REGRETS. GARBO FEELS SEEN. ORGANIZED, EVEN."; } },
+      { t:"TIE OFF", fn(e){
+          if (e.sorted){ e.spareable = true; return "YOU TIE GARBO'S TOP INTO A NEAT LITTLE BOW. CONTAINED. COMPLETE. AT PEACE."; }
+          return "GARBO'S CONTENTS ARE TOO CHAOTIC TO TIE. SORT FIRST. EVERY JANITOR KNOWS THIS."; } }
+    ],
+    killText:"GARBO SCATTERS. LITTERING. IN A WAY, WE ARE ALL RESPONSIBLE.",
+    spareText:"GARBO SHUFFLES OFF TO A QUIET CORNER, HOLDING HIS BOW HIGH."
+  },
+  banana: {
+    name:"SLIPPY", spr:bananaSpr, hp:70, atk:9, def:0, exp:30, crumbs:26, pattern:"slip",
+    check:"SLIPPY - ATK 9 DEF 0. A BANANA PEEL WITH A GRUDGE AND EXCELLENT AIM. THE CLASSIC HAZARD.",
+    quotes:["EVERYONE LAUGHS UNTIL THEY'RE HORIZONTAL.","I'VE TAKEN DOWN MASCOTS, PLUMBERS, AND ONE AMBULANCE.","COMEDY IS JUST PHYSICS WITH TIMING.","WHOOPS!"],
+    acts:[
+      { t:"COMPOST PROMISE", fn(e){ e.promised = true; return "YOU PROMISE SLIPPY A DIGNIFIED COMPOST RETIREMENT. GREEN FIELDS. WORMS. LEGACY."; } },
+      { t:"STICK THE LANDING", fn(e){
+          if (e.promised){ e.spareable = true; return "YOU DELIBERATELY SLIP ON SLIPPY AND STICK A PERFECT THREE-POINT LANDING. SLIPPY WEEPS. ART."; }
+          return "SLIPPY REFUSES TO BE SLIPPED ON BY A CYNIC. PROMISE IT A FUTURE FIRST."; } }
+    ],
+    killText:"SLIPPY BROWNS INSTANTLY AND GOES STILL. NATURE IS METAL.",
+    spareText:"SLIPPY CARTWHEELS AWAY TOWARD A BETTER TOMORROW."
+  },
+  gator: {
+    name:"SNAPJAW", spr:gatorSpr, hp:650, atk:11, def:4, exp:350, crumbs:300, pattern:"gator",
+    check:"SNAPJAW - ATK 11 DEF 4. THE GIANT GATOR OF THE DEEP SEWER. HE SMELLED YOUR ROLLS THREE BOROUGHS AWAY.",
+    quotes:[],
+    acts:[
+      { t:"TOSS A ROLL", fn(e){
+          e.mercy++;
+          if (e.mercy === 1) return "YOU MIME TOSSING A ROLL. SNAPJAW DIVES SPECTACULARLY. HE SURFACES BETRAYED, BUT INTRIGUED.";
+          e.rollTossed = true;
+          return "YOU TOSS A REAL CORNER OF ROLL. SNAPJAW CATCHES IT LIKE IT'S THE LAST WARM THING ON EARTH. MAYBE IT IS."; } },
+      { t:"BELLY RUB", fn(e){
+          if (e.rollTossed){ e.spareable = true; return "YOU RUB THE GATOR'S BELLY. HIS LEG THUMPS THE WATER LIKE A DEPTH CHARGE. HE'S A GOOD BOY NOW."; }
+          return "HE'S ALL TEETH AND SUSPICION. FEED HIM SOMETHING REAL FIRST."; } }
+    ],
+    killText:"SNAPJAW SINKS BENEATH THE MURK, SLOW AND QUIET. THE SEWER FEELS BIGGER AND EMPTIER.",
+    spareText:"SNAPJAW ROLLS OVER, PADDLING HAPPILY. HE COUGHS UP THE LADDER RUNGS. AND A LICENSE PLATE. AND SOMEONE'S RETAINER."
+  }
+});
+Object.assign(GROUPS, {
+  sewer1: ["trashbag"], sewer2: ["banana", "trashbag"],
+  gatorFight: ["gator"]
+});
+function checkGatorPhase(e){
+  const frac = e.hp / e.maxhp;
+  if (B.bossPhase === 1 && frac <= 0.66 && e.alive){
+    B.bossPhase = 2;
+    B.bossDlgQueue.push([
+      { t:"SNAPJAW SLAMS HIS TAIL. THE WHOLE CHAMBER SLOSHES." },
+      { t:"SNAPJAW: GIVE. THE ROLLS. EVERYTHING DOWN HERE IS COLD AND WET AND EATEN ALREADY." }
+    ]);
+  }
+  if (B.bossPhase === 2 && frac <= 0.33 && e.alive){
+    B.bossPhase = 3;
+    B.bossDlgQueue.push([
+      { t:"SNAPJAW: EVERYONE DOWN HERE EATS GARBAGE. I JUST WANTED ONE WARM THING. ONE." },
+      { p:"mega", name:"MEGAFIRE", t:"OH NO. HE'S JUST LIKE THE FREEZER KING. AND THE PIT. WHY IS EVERY BOSS HUNGRY AND SAD?!" },
+      { p:"bob", name:"BOB", t:"DON'T FALL FOR IT! ...OKAY, FALL FOR IT A LITTLE. LOOK AT HIS FACE." }
+    ]);
+  }
+}
+Object.assign(EXTRA_PATTERNS, {
+  lob(e, t, spdMul, box){
+    const count = B.bullets.filter(b => b.kind === "bounce").length;
+    if (t % 66 === 14 && count < 4){
+      const ang = rnd(0.5, 1.2) + pick([0, Math.PI / 2, Math.PI, -Math.PI / 2]);
+      spawnBullet({ x: box.x + box.w / 2 + rnd(-30, 30), y: box.y + 10,
+        vx: Math.cos(ang) * 1.6 * spdMul, vy: Math.abs(Math.sin(ang)) * 1.6 * spdMul + 0.4,
+        r: 5, dmg: e.atk, col: pick(["#5c6b52", "#6b5c52", "#3a4152"]), kind:"bounce", life: 300 });
+    }
+    if (t % 52 === 30) aimShot(e, box, 1.9 * spdMul, "#c9a05c", "ball", 4);
+  },
+  slip(e, t, spdMul, box){
+    if (t % 40 === 8){
+      aimShot(e, box, 2.7 * spdMul, "#ffe14a", "chip", 4, 0.55);
+      aimShot(e, box, 2.7 * spdMul, "#ffe14a", "chip", 4, -0.55);
+    }
+    if (t % 90 === 50) aimShot(e, box, 2.2 * spdMul, "#f2ede8", "ball", 3);
+  },
+  gator(e, t, spdMul, box){
+    const ph = B.bossPhase;
+    // the CHOMP: teeth close in from top and bottom, leaving a moving gap
+    if (t % (ph >= 3 ? 52 : 64) === 20){
+      const gap = (Math.sin(t * 0.017 + e.seed) * 0.5 + 0.5) * (box.w - 48) + box.x + 24;
+      for (let x = box.x + 8; x < box.x + box.w - 4; x += 20)
+        if (Math.abs(x - gap) >= 20){
+          spawnBullet({ x, y: box.y + 4, vx: 0, vy: 1.1 * spdMul, r: 4, dmg: e.atk, col:"#f2ede8", kind:"chip" });
+          spawnBullet({ x, y: box.y + box.h - 4, vx: 0, vy: -1.1 * spdMul, r: 4, dmg: e.atk, col:"#f2ede8", kind:"chip" });
+        }
+    }
+    if (t % 48 === 6) aimShot(e, box, 2.0 * spdMul, "#58a0e0", "ball", 4);
+    if (ph >= 2 && t % 15 === 0){
+      const a = t * 0.14;
+      spawnBullet({ x: box.x + box.w / 2, y: box.y + box.h / 2 - 10,
+        vx: Math.cos(a) * 1.25 * spdMul, vy: Math.sin(a) * 1.25 * spdMul, r: 4, dmg: e.atk, col:"#4a8f3c", kind:"ring" });
+    }
+    if (ph >= 3 && t % 130 === 65)
+      spawnBullet({ x: box.x + 12, y: box.y + 8, vx: 0.5, vy: 0.5, r: 5, dmg: e.atk + 2, col:"#f5cd7a", kind:"homing", life: 250 });
+  }
+});
+
+// ---- ch4 barriers (shares the generic barrier check) ----
+CH3_BARRIERS.push({ room:"pipeway", rect:{ x:420, y:52, w:22, h:134 }, flag:"bobBlast" });
+
+// ---- ch4 rooms ----
+Object.assign(ROOMS, {
+  sewerfall: {
+    w: 320, h: 240, music: "sewer", dark: true,
+    floor: "#1c2418",
+    walls: [
+      { x:0, y:0, w:320, h:70 }, { x:0, y:226, w:320, h:14 },
+      { x:0, y:0, w:14, h:240 },
+      { x:306, y:0, w:14, h:120 }, { x:306, y:176, w:14, h:64 },
+      { x:120, y:150, w:90, h:22 }  // water channel (can't wade)
+    ],
+    deco(){
+      diamondFloor(320, 240, "#242e1e", 18);
+      wallFace(0, 0, 320, 70, "#101408", "#202816");
+      // pipes
+      ctx.fillStyle = "#3a4152"; ctx.fillRect(30, 8, 24, 62); ctx.fillRect(250, 8, 24, 62);
+      ctx.fillStyle = "#4a5266"; ctx.fillRect(34, 8, 6, 62); ctx.fillRect(254, 8, 6, 62);
+      // broken ladder up
+      ctx.fillStyle = "#6a7288";
+      ctx.fillRect(150, 10, 4, 30); ctx.fillRect(166, 10, 4, 30);
+      ctx.fillRect(150, 16, 20, 3); ctx.fillRect(150, 26, 20, 3);
+      // water channel with slow flow
+      ctx.fillStyle = "#26402e"; ctx.fillRect(120, 150, 90, 22);
+      ctx.fillStyle = "#37564a";
+      for (let x = 0; x < 80; x += 22) ctx.fillRect(124 + (x + G.t / 4) % 80, 156, 12, 3);
+      // manhole light shaft from above
+      ctx.fillStyle = "rgba(200,220,180,0.06)"; ctx.fillRect(140, 0, 40, 150);
+    },
+    npcs: [
+      { id:"ladderbroke", x:160, y:78, spr:null, w:20, h:12, sign:true, noDraw:true,
+        dlg(){ return [
+          { t:"THE EXIT LADDER'S BOTTOM RUNGS ARE MISSING. GNAWED CLEAN OFF." },
+          { p:"bmo", name:"BMO", t:"WHO EATS LADDER RUNGS? WHAT DOWN HERE HAS THAT KIND OF JAW?" },
+          { p:"mega", name:"MEGAFIRE", t:"I DON'T LIKE THE SHAPE OF THAT QUESTION." }
+        ]; } }
+    ],
+    saves: [ { x:60, y:190 } ],
+    exits: [ { x:312, y:120, w:8, h:56, to:"ratkingdom", tx:26, ty:150, dir:"right" } ],
+    spawns: []
+  },
+  ratkingdom: {
+    w: 560, h: 300, music: "sewer", dark: false,
+    floor: "#28301e",
+    walls: [
+      { x:0, y:0, w:560, h:70 }, { x:0, y:286, w:560, h:14 },
+      { x:0, y:0, w:14, h:120 }, { x:0, y:176, w:14, h:124 },
+      { x:550, y:0, w:14, h:120 }, { x:550, y:176, w:14, h:124 },
+      { x:230, y:70, w:100, h:36 }  // the bottle-cap throne dais
+    ],
+    deco(){
+      checkerFloor(560, 286, "#303a24", 20, 70);
+      wallFace(0, 0, 560, 70, "#141808", "#242c14");
+      // string of fairy lights made of glowsticks
+      for (let x = 20; x < 560; x += 20){
+        ctx.fillStyle = ["#58c858", "#ffe14a", "#40e0d0"][Math.floor(x / 20) % 3];
+        ctx.fillRect(x, 60 + Math.round(Math.sin(x / 26) * 3), 3, 6);
+      }
+      // throne of bottle caps
+      ctx.fillStyle = "#5a3c28"; ctx.fillRect(230, 70, 100, 36);
+      ["#e05858", "#58a0e0", "#ffe14a", "#58c858", "#e040c0"].forEach((c, i) => {
+        ctx.fillStyle = c;
+        ctx.beginPath(); ctx.arc(245 + i * 18, 80 + (i % 2) * 10, 6, 0, 7); ctx.fill();
+      });
+      drawTextC("THE RAT KINGDOM", 280, 30, "#c9a05c");
+      drawTextC("POP. 4,000,000 (ISH)", 280, 42, "#6a7288");
+      // dojo mat corner
+      ctx.fillStyle = "#3a5a3c"; ctx.fillRect(400, 200, 120, 60);
+      ctx.fillStyle = "#4a6f4c"; ctx.fillRect(406, 206, 108, 48);
+    },
+    npcs: [
+      { id:"ratking", x:280, y:118, spr:ratKingSpr, w:10, h:10, solid:true, name:"KING RATTIGAN",
+        dlg(n){
+          if (n === 0) return [
+            { t:"KING RATTIGAN: WELCOME, SURFACE FOLK, TO THE RAT KINGDOM. FOUR MILLION SUBJECTS, ONE WORKING THRONE." },
+            { t:"KING RATTIGAN: YOU SMELL OF WARM ROLLS AND POOR DECISIONS. YOU'LL WANT THE EXIT LADDER. SNAPJAW ATE THE RUNGS." },
+            { p:"dorko", name:"DORKO", t:"THE GATOR. OF COURSE IT'S A GATOR. WHERE." },
+            { t:"KING RATTIGAN: PAST THE PIPEWAY. TAKE THE LITTLE BLUE BOMB WITH YOU. HE'S BEEN CRYING INTO MY MOAT FOR WEEKS." }
+          ];
+          return n % 2
+            ? [{ t:"KING RATTIGAN: I ALSO TEACH THE TURTLES. SENSEI WORK IS MOSTLY YELLING 'SHOULDERS DOWN' AT RECKLESS TEENS." }]
+            : [{ t:"KING RATTIGAN: MY CROWN IS A BOTTLE CAP. MY SCEPTER IS A CHURRO. A KING WORKS WITH WHAT THE PIPES PROVIDE." }];
+        } },
+      { id:"ratmerch", x:180, y:150, spr:ratSpr, w:10, h:10, solid:true, name:"MERCHANT RAT",
+        dlg(){ return [{ t:"THE MERCHANT RAT TIPS HIS TINY HAT. HE HAS NO HAT. HE MIMES IT BEAUTIFULLY.", fn: ratShop }]; } },
+      { id:"ratkid", x:350, y:160, spr:ratSpr, w:8, h:8, solid:true, name:"RAT KID",
+        dlg(){ return [{ t:"RAT KID: WHEN I GROW UP I WANNA BE A SUBWAY RAT. THINK BIG, MOM SAYS. DREAM VERTICAL." }]; } },
+      { id:"turt_red", x:430, y:220, spr:turtleRed, w:10, h:10, solid:true, name:"REDBAND",
+        dlg(){ return [{ t:"REDBAND: WE'RE THE SEWER DOJO TURTLES. NO, YOU'RE THINKING OF SOMEONE ELSE. LEGALLY DISTINCT SOMEONE ELSE." }]; } },
+      { id:"turt_blue", x:462, y:236, spr:turtleBlue, w:10, h:10, solid:true, name:"BLUEBAND",
+        dlg(){ return [{ t:"BLUEBAND: SENSEI IS AT THE THRONE. IF HE ASKS, PRACTICE RAN LONG AND NOBODY SKATEBOARDED." }]; } },
+      { id:"turt_orange", x:494, y:222, spr:turtleOrange, w:10, h:10, solid:true, name:"ORANGEBAND",
+        dlg(n){
+          return n % 2 ? [{ t:"ORANGEBAND: IS THAT... PIZZA I SMELL? ROLLS COUNT. ROLLS ABSOLUTELY COUNT. SHARE? SHARE." }]
+                       : [{ t:"ORANGEBAND: COUSIN?! ...OH. SORRY. FROM BEHIND YOU LOOKED EXACTLY LIKE OUR COUSIN." },
+                          { p:"dorko", name:"DORKO", t:"...I GET THAT A LOT DOWN HERE, APPARENTLY." }];
+        } },
+      { id:"turt_purple", x:478, y:252, spr:turtlePurple, w:10, h:10, solid:true, name:"PURPLEBAND",
+        dlg(){ return [{ t:"PURPLEBAND: I'M BUILDING A SKATEBOARD OUT OF A CAFETERIA TRAY AND TWO YO-YOS. FOR SCIENCE. MOSTLY." }]; } },
+      { id:"bob1", x:200, y:230, spr:bobSpr, w:10, h:12, solid:true, name:"BOB", hideFlag:"bobBlast",
+        dlg(n){
+          if (n === 0) return [
+            { p:"bob", name:"BOB", t:"NAME'S BOB. BLUE BOB-OMB. MY 'FRIENDS' FLUSHED ME AS A PRANK. HILARIOUS, RIGHT? I'M NOT LAUGHING. I'M TICKING." },
+            { p:"bob", name:"BOB", t:"THE ONLY WAY OUT IS THE LADDER PAST THE BIG GATOR. NOBODY GETS PAST THE BIG GATOR." },
+            { p:"bob", name:"BOB", t:"YOU'RE GOING ANYWAY? TAKE ME WITH YOU. I EXPLODE. IT'S USEFUL. IT'S ALSO A METAPHOR." },
+            { p:"bmo", name:"BMO", t:"WELCOME ABOARD, BOB. STAND... A RESPECTFUL DISTANCE FROM EVERYONE." },
+            { t:"BOB TRUNDLES AFTER THE PARTY, TICKING CHEERFULLY. HE'LL MEET YOU IN THE PIPEWAY." }
+          ];
+          return [{ p:"bob", name:"BOB", t:"I'LL BE RIGHT BEHIND YOU IN THE PIPEWAY. FUSE'S LIT. METAPHORICALLY. MOSTLY." }];
+        } }
+    ],
+    saves: [ { x:280, y:190 } ],
+    exits: [
+      { x:0, y:120, w:8, h:56, to:"sewerfall", tx:290, ty:148, dir:"left" },
+      { x:552, y:120, w:8, h:56, to:"pipeway", tx:26, ty:110, dir:"right" }
+    ],
+    spawns: []
+  },
+  pipeway: {
+    w: 640, h: 200, music: "sewer", dark: true,
+    floor: "#1c2418",
+    walls: [
+      { x:0, y:0, w:640, h:52 }, { x:0, y:186, w:640, h:14 },
+      { x:0, y:0, w:14, h:82 }, { x:0, y:138, w:14, h:62 },
+      { x:630, y:0, w:14, h:82 }, { x:630, y:138, w:14, h:62 },
+      { x:180, y:120, w:50, h:18 }
+    ],
+    deco(){
+      diamondFloor(640, 200, "#242e1e", 18);
+      wallFace(0, 0, 640, 52, "#101408", "#202816");
+      // big pipe running along the top wall
+      ctx.fillStyle = "#3a4152"; ctx.fillRect(0, 12, 640, 26);
+      ctx.fillStyle = "#4a5266"; ctx.fillRect(0, 16, 640, 6);
+      // drips
+      ctx.fillStyle = "#58a0e0";
+      for (let i = 0; i < 5; i++){
+        const dx2 = 60 + i * 130, dy2 = 40 + ((G.t * (1 + i * 0.2)) % 60);
+        ctx.fillRect(dx2, dy2, 2, 5);
+      }
+      // fallen crate
+      ctx.fillStyle = "#5a4a2e"; ctx.fillRect(180, 120, 50, 18);
+      // the rusted grate
+      if (!G.flags.bobBlast){
+        ctx.fillStyle = "#6a5238";
+        ctx.fillRect(420, 52, 22, 134);
+        ctx.fillStyle = "#7a6248";
+        for (let gy = 58; gy < 186; gy += 16) ctx.fillRect(422, gy, 18, 5);
+      } else {
+        ctx.fillStyle = "#6a5238";
+        [[410,168],[432,174],[446,164],[424,178]].forEach(([x, y]) => ctx.fillRect(x, y, 8, 5));
+      }
+      drawTextC("PIPEWAY 9 3/4", 320, 30, "#58c858");
+    },
+    npcs: [
+      { id:"bob2", x:392, y:110, spr:bobSpr, w:10, h:12, solid:true, name:"BOB", hideFlag:"bobBlast",
+        dlg(){ return [
+          { p:"bob", name:"BOB", t:"RUSTED GRATE. CLASSIC SEWER MOVE. OKAY. EVERYBODY PLUG YOUR EARS AND THINK FONDLY OF ME." },
+          { t:"BOB HUGS THE GRATE. HIS FUSE SIZZLES BRIGHTER... AND BRIGHTER...",
+            fn(){
+              tone(180, 1.0, "square", 0.12, 1600);
+              setTimeout(() => { SFX.boom(); shake(6, 16); }, 1000);
+              setTimeout(() => {
+                G.flags.bobBlast = 1;
+                say([
+                  { t:"KA-BOOM. THE GRATE IS NOW MODERN ART. BOB REASSEMBLES HIMSELF FROM SIX PIECES, BEAMING." },
+                  { p:"bob", name:"BOB", t:"SEE? USEFUL! I'LL SCOUT AHEAD - THE GATOR'S CHAMBER IS PAST HERE. DON'T START WITHOUT ME." },
+                  { t:"BOB ROLLS OFF DOWN THE PIPEWAY, TICKING A HAPPY LITTLE RHYTHM." }
+                ]);
+              }, 1300);
+            } }
+        ]; } },
+      { id:"sewersign", x:60, y:100, spr:null, w:16, h:12, sign:true,
+        dlg(){ return [{ t:"SCRATCHED INTO THE WALL: 'BEWARE THE JAWS. ALSO, THE SMELL. MOSTLY THE JAWS.'" }]; } }
+    ],
+    saves: [],
+    exits: [
+      { x:0, y:82, w:8, h:56, to:"ratkingdom", tx:526, ty:148, dir:"left" },
+      { x:632, y:82, w:8, h:56, to:"gatorlair", tx:30, ty:150, dir:"right" }
+    ],
+    spawns: [
+      { id:"pw_trash", x:200, y:90, spr:trashSpr, group:"sewer1",
+        patrol:{ axis:"x", range:36, spd:0.025 }, flag:"e_pw1" },
+      { id:"pw_slip", x:520, y:150, spr:bananaSpr, group:"sewer2",
+        patrol:{ axis:"y", range:20, spd:0.03 }, flag:"e_pw2" }
+    ]
+  },
+  gatorlair: {
+    w: 320, h: 240, music: "sewer", dark: () => !G.flags.gatorDone,
+    floor: "#1c2418",
+    walls: [
+      { x:0, y:0, w:320, h:70 }, { x:0, y:226, w:320, h:14 },
+      { x:0, y:0, w:14, h:240 }, { x:306, y:0, w:14, h:240 },
+      { x:60, y:84, w:200, h:60 }  // the deep pool
+    ],
+    deco(){
+      diamondFloor(320, 240, "#242e1e", 18);
+      wallFace(0, 0, 320, 70, "#101408", "#202816");
+      drawTextC("THE DEEP POOL", 160, 24, "#4a8f3c");
+      // dark water
+      ctx.fillStyle = "#16281e"; ctx.fillRect(60, 84, 200, 60);
+      ctx.fillStyle = "#1e3628";
+      for (let x = 0; x < 180; x += 30)
+        ctx.fillRect(66 + (x + G.t / 5) % 180, 96 + (x % 3) * 14, 16, 3);
+      if (!G.flags.gatorDone){
+        drawSpr(gatorSpr, 128, 90, {});
+      } else if (G.flags.gatorSpared){
+        drawSpr(gatorSpr, 128, 96, { alpha: 0.9 });
+      }
+      // the hoard (and the ladder, restored after the fight)
+      ctx.fillStyle = "#5a4a2e"; ctx.fillRect(270, 150, 26, 40);
+      ctx.fillStyle = "#c9a05c"; ctx.fillRect(274, 146, 8, 5); ctx.fillRect(284, 154, 8, 5);
+      if (G.flags.gatorDone){
+        ctx.fillStyle = "#6a7288";
+        ctx.fillRect(150, 10, 4, 60); ctx.fillRect(166, 10, 4, 60);
+        for (let ry = 16; ry < 66; ry += 10) ctx.fillRect(150, ry, 20, 3);
+        ctx.fillStyle = "rgba(200,220,180,0.10)"; ctx.fillRect(140, 0, 40, 160);
+      }
+    },
+    npcs: [
+      { id:"gatorface", x:160, y:160, spr:null, w:24, h:12, sign:true, noDraw:true,
+        dlg(){ return G.flags.gatorDone ? ladderScript() : preGatorScript(); } },
+      { id:"bob3", x:60, y:200, spr:bobSpr, w:10, h:12, solid:true, name:"BOB",
+        dlg(){
+          if (G.flags.gatorDone) return [{ p:"bob", name:"BOB", t:"WE DID IT. *I* DID SOME OF IT. I'M PUTTING 'BOSS FIGHT VETERAN' ON MY RESUME." }];
+          return [{ p:"bob", name:"BOB", t:"HE'S IN THE POOL. I CAN HEAR HIM CHEWING. REMEMBER: I EXPLODE EVERY ROUND, YOU DO THE REST." }];
+        } }
+    ],
+    saves: [ { x:60, y:170 } ],
+    exits: [ { x:0, y:120, w:8, h:56, to:"pipeway", tx:606, ty:110, dir:"left" } ],
+    spawns: []
+  }
+});
+
+// ---- ch4 story scripts ----
+function preGatorScript(){
+  return [
+    { t:"A WAKE FORMS IN THE DARK WATER. TWO EYES SURFACE. THEN TEETH. SO, SO MANY TEETH." },
+    { t:"SNAPJAW: ROLLS. I SMELL ROLLS. HAND 'EM OVER AND NOBODY GETS GUMMED." },
+    { p:"dorko", name:"DORKO", t:"THESE ROLLS HAVE BEEN THROUGH A FRIDGE, A CON, AND A CORPORATION. COME AND TAKE THEM." },
+    { p:"bob", name:"BOB", t:"I'M WITH THEM, SCALY! EVERYBODY PLUG YOUR EARS, IT'S ABOUT TO GET LOUD EVERY SINGLE ROUND!" },
+    { fn(){ startBattle("gatorFight", null); }, t:"SNAPJAW EXPLODES OUT OF THE POOL, JAWS FIRST!" }
+  ];
+}
+function postGatorScript(){
+  if (G.flags.gatorSpared){
+    return [
+      { t:"SNAPJAW FLOATS ON HIS BACK, BELLY UP, RADIATING CONTENTMENT AND MILD EMBARRASSMENT." },
+      { p:"mega", name:"MEGAFIRE", t:"WE'LL BRING YOU A WHOLE BAG OF ROLLS, BUDDY. WARM ONES. EVERY MONTH. I PROMISE." },
+      { t:"THE LADDER RUNGS ARE BACK WHERE THEY BELONG. THE WAY HOME IS OPEN." }
+    ];
+  }
+  return [
+    { t:"THE POOL GOES STILL. AMONG THE HOARD: THE LADDER RUNGS, POLISHED LIKE TREASURE." },
+    { p:"bob", name:"BOB", t:"...I KIND OF WANTED TO BE THE ONE TO EXPLODE HIM. EMOTIONALLY, I MEAN. LET'S GO HOME." },
+    { t:"THE LADDER RUNGS ARE BACK WHERE THEY BELONG. THE WAY HOME IS OPEN." }
+  ];
+}
+function ladderScript(){
+  return [
+    { t:"THE LADDER STANDS WHOLE AGAIN, MORNING LIGHT SPILLING DOWN THE SHAFT." },
+    { t:"CLIMB OUT? FOR REAL, ACTUALLY, FINALLY REAL THIS TIME?", choices:[
+      { t:"CLIMB OUT", fn(){
+          say([
+            { p:"dorko", name:"DORKO", t:"FOUR DARK WORLDS. ONE FAMILY OF ROLLS. IF THERE'S A FIFTH, I'M EATING IT." },
+            { p:"mega", name:"MEGAFIRE", t:"I NEED A SHOWER, A NAP, AND POSSIBLY A SUPPORT GROUP FOR PEOPLE WHO KEEP FALLING INTO KINGDOMS." },
+            { t:"BOB CLIMBS OUT LAST, EYES WATERING IN THE DAYLIGHT." },
+            { p:"bob", name:"BOB", t:"DAYLIGHT. REAL DAYLIGHT. YOU GUYS NEED A ROOMMATE? I'M QUIET. EXCEPT WHEN I'M NOT." },
+            { p:"bmo", name:"BMO", t:"NEW PARTY MEMBER UNLOCKED AT THE VERY END. CLASSIC. WELCOME HOME, BOB." },
+            { t:"YOU WALK HOME TOGETHER IN THE MORNING SUN, DAMP AND VICTORIOUS, ROLLS HELD HIGH." }
+          ], () => {
+            G.flags.ch4Done = 1;
             G.flags.endRoute = endRoute();
             saveGame();
             stopMusic();
@@ -5103,7 +5705,7 @@ function finalHomeScript(){
             playJingle("victory");
           });
         } },
-      { t:"NOT YET", fn(){ say([{ p:"bmo", name:"BMO", t:"SURE. ONE MORE LAP AROUND THE DISCO. FOR THE ROAD." }]); } }
+      { t:"NOT YET", fn(){ say([{ p:"bob", name:"BOB", t:"TAKE YOUR TIME. I'VE WAITED WEEKS. I CAN WAIT FIVE MORE MINUTES. BARELY." }]); } }
     ] }
   ];
 }
@@ -5211,6 +5813,7 @@ function endingScript(){
         G.flags.gotRolls = 1; G.flags.endRoute = endRoute(); G.flags.wentHome = 1;
         SFX.eat();
         enterRoom("kitchen", 66, 128, true);
+        tone(220, 0.06, "square", 0.25, 500); // the fridge door pops open
         saveGame();
         say(homecomingScript(), () => saveGame());
       } }
@@ -5377,7 +5980,8 @@ function drawEnd(){
             : route === "violent" ? ["THE COLD ENDING", "#9fd8f0"]
             : ["THE SNACK ENDING", "#ffe14a"];
   drawTextC(sub[0], 160, 36, sub[1]);
-  if (G.flags.ch3Done) drawTextC("CHAPTERS 1 + 2 + 3 COMPLETE", 160, 46, "#e040c0");
+  if (G.flags.ch4Done) drawTextC("CHAPTERS 1 + 2 + 3 + 4 COMPLETE", 160, 46, "#e040c0");
+  else if (G.flags.ch3Done) drawTextC("CHAPTERS 1 + 2 + 3 COMPLETE", 160, 46, "#e040c0");
   else if (G.flags.ch2Done) drawTextC("CHAPTERS 1 + 2 COMPLETE", 160, 46, "#e040c0");
   // everyone you kept takes a bow
   const lineup = [dorkoFront, megaFront, bmoFront];
@@ -5397,7 +6001,11 @@ function drawEnd(){
     lineup.push(mgSpr);
     if (G.flags.rollySpared && route !== "violent") lineup.push(rollySpr);
   }
-  const gap = lineup.length > 10 ? 3 : 6;
+  if (G.flags.ch4Done){
+    lineup.push(bobSpr);
+    if (G.flags.gatorSpared && route !== "violent") lineup.push(gatorSpr);
+  }
+  const gap = lineup.length > 12 ? 2 : lineup.length > 10 ? 3 : 6;
   const totalW = lineup.reduce((a, s) => a + s.width, 0) + gap * (lineup.length - 1);
   let lx = 160 - totalW / 2;
   lineup.forEach((s, i) => {
