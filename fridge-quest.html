@@ -1795,6 +1795,15 @@ Object.assign(ROOMS, {
       ctx.fillStyle = "#c87878"; ctx.fillRect(124, 148, 34, 16); ctx.fillRect(162, 148, 34, 16);
       ctx.fillStyle = "#8a4a4a"; ctx.fillRect(120, 144, 6, 30); ctx.fillRect(194, 144, 6, 30);
       ctx.fillStyle = "rgba(90,110,160,0.25)"; ctx.fillRect(60, 108, 100, 30);
+      if (G.flags.ransacked){
+        // the corporation was here
+        ctx.fillStyle = "#f2ede8";
+        [[70,120],[95,182],[232,122],[262,192],[150,202],[318,132],[46,168]].forEach(([x, y]) => ctx.fillRect(x, y, 8, 5));
+        ctx.fillStyle = "#c87878"; ctx.fillRect(84, 124, 30, 14); ctx.fillRect(212, 188, 30, 14); // frisked cushions
+        ctx.fillStyle = "#f5e8c0"; ctx.fillRect(312, 20, 32, 42); // THE NOTICE, stapled to the wall
+        ctx.fillStyle = "#e05858"; ctx.fillRect(315, 24, 26, 5);
+        ctx.fillStyle = "#14141c"; ctx.fillRect(315, 34, 26, 2); ctx.fillRect(315, 39, 20, 2); ctx.fillRect(315, 44, 24, 2); ctx.fillRect(315, 49, 16, 2);
+      }
     },
     npcs: [
       { id:"tv", x:236, y:96, spr:null, w:16, h:12, sign:true, noDraw:true,
@@ -1805,7 +1814,15 @@ Object.assign(ROOMS, {
       { id:"consoles", x:223, y:112, spr:null, w:16, h:10, sign:true, noDraw:true,
         dlg(){ return [{ p:"bmo", name:"BMO", t:"MY CONSOLES! MY SAVES! HELLO, BEAUTIFUL BACKLOG. I DIDN'T FORGET YOU. I WOULD NEVER." }]; } },
       { id:"couch", x:160, y:180, spr:null, w:16, h:10, sign:true, noDraw:true,
-        dlg(){ return [{ p:"dorko", name:"DORKO", t:"THE COUCH. SCENE OF MY GREATEST NAPS. WE RIDE AT DUSK. AFTER A NAP." }]; } }
+        dlg(){
+          if (G.flags.ransacked) return [{ p:"dorko", name:"DORKO", t:"THEY FRISKED MY NAP COUCH. THIS IS PERSONAL NOW." }];
+          return [{ p:"dorko", name:"DORKO", t:"THE COUCH. SCENE OF MY GREATEST NAPS. WE RIDE AT DUSK. AFTER A NAP." }];
+        } },
+      { id:"notice", x:328, y:62, spr:null, w:16, h:12, sign:true, noDraw:true, needFlag:"ransacked",
+        dlg(){ return [
+          { t:"THE NOTICE, IN FULL: 'ITEMS SEIZED: PIZZA ROLLS (MYTHICAL, 1 BAG). LEFTOVERS (SENTIMENTAL). ONE COMIC BOOK COLLECTION (NOT EVEN YOURS).'" },
+          { p:"bmo", name:"BMO", t:"WAIT, WHOSE COMICS?" }
+        ]; } }
     ],
     saves: [],
     exits: [
@@ -2029,6 +2046,8 @@ function collides(box, room){
     for (const b of puzzleBlocks) if (overlaps(box, blockRect(b))) return true;
   }
   if (G.roomId === "hotelhall" && !G.flags.keycard && overlaps(box, KEY_BARRIER)) return true;
+  for (const bar of CH3_BARRIERS)
+    if (bar.room === G.roomId && !G.flags[bar.flag] && overlaps(box, bar.rect)) return true;
   for (const n of room.npcs){
     if (n.needFlag && !G.flags[n.needFlag]) continue;
     if (n.hideFlag && G.flags[n.hideFlag]) continue;
@@ -2517,6 +2536,9 @@ const SPELLS = {
            { name:"LULLABYTE", cost:40, kind:"slow", desc:"SING. NEXT WAVE OF BULLETS IS SLEEPY." } ]
 };
 
+// later chapters register extra bullet patterns here: {name: (enemy, t, spdMul, box) => ...}
+const EXTRA_PATTERNS = {};
+
 let B = null;
 function startBattle(groupId, flag){
   const ids = GROUPS[groupId];
@@ -2537,18 +2559,22 @@ function startBattle(groupId, flag){
     bullets:[], fx:[], dmgNums:[],
     fightX:0, fightDone:false, fightTargets:[],
     phaseT:0, phaseLen:400, slowNext:1, curSlow:1,
-    bossPhase:1, bossDlgQueue:[], canFlee: !(groupId === "tut" || groupId === "boss" || groupId === "kongyFight" || groupId === "secret" || groupId === "ballpitFight"),
+    bossPhase:1, bossDlgQueue:[], canFlee: !(groupId === "tut" || groupId === "boss" || groupId === "kongyFight" || groupId === "secret" || groupId === "ballpitFight" || groupId === "rollyFight"),
     tutorial: groupId === "tut", tutHintT:0,
     rewardExp:0, rewardCrumbs:0, endFlavor:""
   };
   G.mode = "battle";
   SFX.encounter();
-  playMusic(groupId === "boss" || groupId === "secret" || groupId === "ballpitFight" ? "boss" : "battle");
+  playMusic(groupId === "boss" || groupId === "secret" || groupId === "ballpitFight" || groupId === "rollyFight" ? "boss" : "battle");
   B.msg = B.tutorial ? "A WILD GHERKIN JIGGLES INTO YOUR PATH!"
         : groupId === "boss" ? "KING GLACION DESCENDS FROM HIS FROSTBITTEN THRONE!"
         : groupId === "kongyFight" ? "KONGY GORGONZOLA BEATS HIS MAGNIFICENT CHEST!"
         : groupId === "secret" ? "CRISPUS PUFFS UP WITH NITROGEN AND EXISTENTIAL FURY!"
         : groupId === "ballpitFight" ? "THE BALL PIT RISES LIKE A SOFT, TERRIBLE TIDE!"
+        : groupId === "rollyFight" ? "ROLLY VAULTS ACROSS THE BOARDROOM TABLE, GLOVES UP!"
+        : groupId === "band" ? "THE QUARTERLY EARNINGS COUNT OFF: ONE! TWO! ONE-TWO-THREE-FOUR!"
+        : groupId === "comics" ? "SEVEN ISSUES OF PURE RESENTMENT TAKE WING!"
+        : G.flags.ch3 ? pick(["THE DISCO BALL SPINS FASTER!", "SOMETHING FUNKY THIS WAY COMES!", "THE BEAT DROPS. SO DOES THE TEMPERATURE."])
         : G.flags.ch2 ? pick(["THE DARK CON HUMS WITH STATIC!", "A CHALLENGER LOOMS BETWEEN THE BOOTHS!", "IT SMELLS LIKE ENERGY DRINKS AND MENACE."])
         : pick(["THE COLD AIR CRACKLES!", "SNACKS APPROACH WITH INTENT!", "IT SMELLS LIKE TROUBLE. AND FOOD."]);
   if (B.tutorial && !G.flags.tutSeen){
@@ -2594,6 +2620,7 @@ function hurtEnemy(e, dmg){
   if (e.defId === "glacion") checkBossPhase(e);
   if (e.defId === "chips") checkChipsPhase(e);
   if (e.defId === "ballpit") checkBallpitPhase(e);
+  if (e.defId === "rolly") checkRollyPhase(e);
 }
 function checkChipsPhase(e){
   if (!e.phase2 && e.alive && e.hp <= e.maxhp / 2){
@@ -2962,6 +2989,13 @@ function enemyBubble(){
       3: ["NOBODY STAYS...", "I JUST WANTED A FULL PIT...", "ONE MORE GUEST. JUST ONE. FOREVER."]
     }[B.bossPhase];
     B.bubble = { text: lines[B.turn % lines.length], e };
+  } else if (e.defId === "rolly"){
+    const lines = {
+      1: ["HAVE YOU TRIED OUR NEW RANCH VARIANT?", "SMILES ARE MANDATORY. MINE IS PAINTED ON.", "BRAND LOYALTY IS FOREVER."],
+      2: ["PLEASE ENJOY RESPONSIBLY.", "THE ROLL PROVIDES. THE ROLL PROVIDES.", "SYNERGY. SYNERGY. SYNERGY."],
+      3: ["...WATER...", "...OVERTIME ISN'T REAL IF YOU LOVE YOUR JOB...", "...HELP..."]
+    }[B.bossPhase];
+    B.bubble = { text: lines[B.turn % lines.length], e };
   } else if (e.defId === "chips"){
     B.bubble = { text: pick(e.phase2 ? CHIPS_PANIC_QUOTES : e.quotes), e };
   } else {
@@ -2975,7 +3009,7 @@ function startBullets(){
   B.bullets = [];
   B.soul.x = B.box.x + B.box.w / 2; B.soul.y = B.box.y + B.box.h / 2; B.soul.inv = 0;
   B.phaseT = 0;
-  B.phaseLen = (B.groupId === "boss" || B.groupId === "ballpitFight") ? 430 + B.bossPhase * 30 : B.groupId === "secret" ? 430 : 380;
+  B.phaseLen = (B.groupId === "boss" || B.groupId === "ballpitFight" || B.groupId === "rollyFight") ? 430 + B.bossPhase * 30 : B.groupId === "secret" ? 430 : 380;
   B.curSlow = B.slowNext; B.slowNext = 1;
   B.tutHintT = B.tutorial ? 240 : 0;
   setState("bullets");
@@ -3062,9 +3096,11 @@ function applyPartyDamage(dmg){
 function runPattern(e){
   const t = B.phaseT, box = B.box;
   const pat = e.pattern === "boss" ? null : e.pattern;
-  const spdMul = (e.soft ? 0.75 : 1) * ((B.groupId === "boss" || B.groupId === "ballpitFight") ? 1 + (B.bossPhase - 1) * 0.18 : 1);
+  const spdMul = (e.soft ? 0.75 : 1) * ((B.groupId === "boss" || B.groupId === "ballpitFight" || B.groupId === "rollyFight") ? 1 + (B.bossPhase - 1) * 0.18 : 1);
   if (e.pattern === "boss"){ bossPattern(e, t, spdMul); return; }
   if (e.pattern === "ballpit"){ ballpitPattern(e, t, spdMul); return; }
+  if (e.pattern === "rolly"){ rollyPattern(e, t, spdMul); return; }
+  if (EXTRA_PATTERNS[e.pattern]){ EXTRA_PATTERNS[e.pattern](e, t, spdMul, box); return; }
   if (pat === "aimed"){
     if (t % 46 === 8){
       aimShot(e, box, 2.1 * spdMul, "#8ecf5e", "pickle", 4);
@@ -3169,32 +3205,32 @@ function bossPattern(e, t, spdMul){
 
 // ---- battle end ----
 function finishBattle(won){
-  const wasBoss = B.groupId === "boss";
-  const wasPit = B.groupId === "ballpitFight";
+  const gid = B.groupId;
   const allSpared = B.enemies.every(e => e.spared);
   const flag = B.flag;
   if (won && flag) G.flags[flag] = true;
-  if (won && wasBoss){
-    G.flags.bossDone = true;
-    G.flags.bossSpared = allSpared;
-  }
-  if (won && wasPit){
-    G.flags.ballpitDone = true;
-    G.flags.ballpitSpared = allSpared;
-  }
-  if (won && B.groupId === "kongyFight") G.flags.kongySpared = allSpared;
-  if (won && B.groupId === "secret") G.flags.secretSpared = allSpared;
+  if (won && gid === "boss"){ G.flags.bossDone = true; G.flags.bossSpared = allSpared; }
+  if (won && gid === "ballpitFight"){ G.flags.ballpitDone = true; G.flags.ballpitSpared = allSpared; }
+  if (won && gid === "rollyFight"){ G.flags.rollyDone = true; G.flags.rollySpared = allSpared; }
+  if (won && gid === "kongyFight") G.flags.kongySpared = allSpared;
+  if (won && gid === "secret") G.flags.secretSpared = allSpared;
+  if (won && gid === "comics") G.flags.comicsSpared = allSpared;
   B = null;
   G.mode = "world";
   G.invuln = 100;
   G.party.forEach(p => { if (p.hp <= 0) p.hp = 1; });
   playMusic(ROOMS[G.roomId].music);
-  if (won && (wasBoss || wasPit)){
-    const script = wasPit ? postBallpitScript : postBossScript;
-    const isDone = wasPit ? () => G.flags.ch2Done : () => G.flags.gotRolls;
+  const postMap = {
+    boss:         { script: () => postBossScript(),    done: () => G.flags.gotRolls },
+    ballpitFight: { script: () => postBallpitScript(), done: () => G.flags.ch2Done },
+    comics:       { script: () => postComicsScript(),  done: () => G.flags.boardroomOpen },
+    rollyFight:   { script: () => postRollyScript(),   done: () => G.flags.ch3Done }
+  };
+  const pm = postMap[gid];
+  if (won && pm){
     const tryPost = () => {
-      if (isDone() || G.mode === "title" || G.mode === "end" || G.mode === "gameover") return;
-      if (G.mode === "world" && !G.dialog && !G.menu){ say(script()); return; }
+      if (pm.done() || G.mode === "title" || G.mode === "end" || G.mode === "gameover") return;
+      if (G.mode === "world" && !G.dialog && !G.menu){ say(pm.script()); return; }
       setTimeout(tryPost, 300);
     };
     setTimeout(tryPost, 400);
@@ -4367,15 +4403,13 @@ function goHomeScript(){
           say([
             { p:"dorko", name:"DORKO", t:"TWO DARK WORLDS. ONE BAG OF ROLLS. GOOD WEEKEND." },
             { p:"mega", name:"MEGAFIRE", t:"I MADE FRIENDS WITH A FREEZER, A CHEESE GORILLA, AND A HOLE FULL OF BALLS. I'M SO TIRED. I'M SO HAPPY." },
-            { p:"bmo", name:"BMO", t:"ROLL CREDITS. AGAIN. FOR REAL THIS TIME." },
-            { t:"YOU DRIVE HOME AS THE SUN COMES UP. SOMEONE SNORES. SOMEONE ELSE IS RECORDING IT." }
+            { p:"bmo", name:"BMO", t:"HOME, DRIVER. AND BY HOME I MEAN NAPS." }
           ], () => {
             G.flags.ch2Done = 1;
-            G.flags.endRoute = endRoute();
+            G.flags.ransacked = 1;
+            enterRoom("living", 180, 130, true);
             saveGame();
-            stopMusic();
-            G.mode = "end"; G.endTimer = 0;
-            playJingle("victory");
+            say(ransackedScript());
           });
         } },
       { t:"NOT YET", fn(){ say([{ p:"bmo", name:"BMO", t:"YEAH, SOAK IT IN. WE EARNED THE LANYARDS." }]); } }
@@ -4383,6 +4417,696 @@ function goHomeScript(){
   ];
 }
 
+// ================= CHAPTER 3: OFFICE DISCO =================
+
+// ---- sprites ----
+const mgPal = { H:"#58c858", D:"#2e8f3c", g:"#9aa2b8", G:"#6a7288", C:"#4a5a8c", k:"#14141c", w:"#ffffff" };
+const mgSpr = S([
+"....HHHHHH......",
+"...HHHHHHHH.....",
+"..HHDDDDDDHH....",
+"..HDHHHHHHDH....",
+"..gggggggggg....",
+".ggkkggggkkgg...",
+".gggggggggggg...",
+"..ggggkkgggg....",
+"..HHHHHHHHHH....",
+".HHHHHHHHHH.CC..",
+".HHDDDDDDHH.CCC.",
+"g.gggggggg..CCC.",
+"g.gGGGGGGg...C..",
+".ggg....ggg.....",
+".DDg....gDD.....",
+], mgPal);
+const mgPort = S([
+"......HHHHHHHHHH........",
+"....HHHHHHHHHHHHHH......",
+"...HHDDDDDDDDDDDDHH.....",
+"...HDHHHHHHHHHHHHDH.....",
+"...HHHHHHHHHHHHHHHH.....",
+"..gggggggggggggggggg....",
+"..ggkkkkggggggkkkkgg....",
+"..ggkkkkggggggkkkkgg....",
+"..gggggggggggggggggg....",
+"..gggggggggggggggggg....",
+"..ggggggkkkkkkgggggg....",
+"..gggggkggggggkggggg....",
+"..gggggggggggggggggg....",
+"...HHHHHHHHHHHHHHHH.....",
+"...HHHDDDDDDDDDDHHH.....",
+"........................",
+], mgPal);
+PORTRAITS.mg = mgPort;
+VOICES.mg = 400;
+const staplerSpr = S([
+"..ssssssssss..",
+".sswkssssssss.",
+".ssssssssssss.",
+"..SSSSSSSSSS..",
+"..............",
+".mmmmmmmmmmmm.",
+".mmmmmmmmmmmm.",
+"..MMMMMMMMMM..",
+], { s:"#c9c9d8", S:"#8a93a8", m:"#5a6378", M:"#3a4152", k:"#14141c", w:"#ffffff" });
+const bassSpr = S([
+"...kkkk.......",
+"..kkkkkk......",
+".kkkkkkkk.....",
+"..oooooo......",
+"..owkkwo......",
+"..oooooo......",
+"...tttt.......",
+"..tttttt.s....",
+".tttttttt.s...",
+".ttkkkktt.s...",
+".ttkkkktt.s...",
+".tttttttts....",
+"..tttttt......",
+"...tttt.......",
+], { k:"#20242c", o:"#c9995c", t:"#8a5a2c", s:"#c9c9d8", w:"#ffffff" });
+const drumSpr = S([
+".BBBBBBBBBBBB.",
+".BwkBBBBBBwkB.",
+".BBBBBBBBBBBB.",
+".BrrBggByyBcc.",
+".BrrBggByyBcc.",
+".BBBBBBBBBBBB.",
+".BkkkkkkkkkkB.",
+".BBBBBBBBBBBB.",
+"..BB......BB..",
+], { B:"#3a4152", r:"#e05858", g:"#58c858", y:"#ffe14a", c:"#40e0d0", k:"#14141c", w:"#ffffff" });
+const comicSpr = S([
+".wwwwww.wwwwww.",
+".wyyyywkwrrrrw.",
+".wykkyw kwrkkw.",
+".wyyyyw kwrrrw.",
+".wwkkww kwwkww.",
+".wwwwww.wwwwww.",
+".wwkwww.wwwkww.",
+".wwwwww.wwwwww.",
+".wwwwwwkwwwwww.",
+"..wwwww.wwwww..",
+], { w:"#f2ede8", y:"#ffe14a", r:"#e05858", k:"#14141c" });
+const rollySpr = S([
+"......pppppppppppp......",
+"....pppPPPPPPPPPPppp....",
+"...ppPPPPPPPPPPPPPPpp...",
+"..ppPPwwwwPPPPwwwwPPpp..",
+"..pPPwwwwwwPPwwwwwwPPp..",
+".ppPPwwkkwwPPwwkkwwPPpp.",
+".pPPPwwkkwwPPwwkkwwPPPp.",
+"wwpPPwwwwwwPPwwwwwwPPpww",
+"wwpPPPwwwwPPPPwwwwPPPpww",
+"wwpPPPPPPPPPPPPPPPPPpww.",
+".wpPPPkkkkkkkkkkkkPPpw..",
+"..pPPPkPPPPPPPPPPkPPp...",
+"..pPPPkkkkkkkkkkkkPPp...",
+"..ppPPPPPPPPPPPPPPPpp...",
+"...ppPPPPPPPPPPPPpp.....",
+"....ppppppppppppppp.....",
+".....pp..pppp..pp.......",
+".....pp..pppp..pp.......",
+"....ppp..........ppp....",
+], { p:"#c07830", P:"#f5cd7a", w:"#ffffff", k:"#14141c" });
+
+// ---- ch3 music: office disco ----
+Object.assign(SONGS, {
+  disco: {
+    bpm: 112, tracks: [
+      { wave: "square", vol: 0.09, seq:
+        "E5 ~  .  .  D5 ~  .  .  C5 ~  .  A4 C5 ~  .  .  D5 ~  .  .  E5 ~  .  G5 E5 ~  D5 C5 D5 ~  .  ." },
+      { wave: "square", vol: 0.06, seq:
+        ".  C4 .  E4 .  .  G4 .  .  F4 .  A4 .  .  C5 .  .  G4 .  B4 .  .  D5 .  C5 .  G4 .  E4 .  .  ." },
+      { wave: "triangle", vol: 0.26, seq:
+        "C2 .  C3 .  .  C2 C3 .  F2 .  F3 .  .  F2 F3 .  G2 .  G3 .  .  G2 G3 .  E2 .  E3 .  G2 .  A2 ." },
+    ],
+    noise: "k . h h s . h . k . h h s . h h k . h h s . h . k . h h s . h h"
+  }
+});
+
+// ---- ch3 items + bar ----
+Object.assign(ITEMS, {
+  groove:  { name:"GROOVE JUICE",  heal:60, tp:30, desc:"FUNK IN A GLASS. 60 HP, 30% TP." },
+  coffee:  { name:"OFFICE COFFEE", heal:35, desc:"BURNT AT 9 AM. STILL LOYAL. 35 HP." },
+  steak:   { name:"EXPENSE STEAK", heal:90, desc:"SOMEONE ELSE'S BUDGET. 90 HP." }
+});
+const BAR_STOCK = [ ["coffee", 15], ["groove", 40], ["steak", 60] ];
+function barShop(){
+  const choices = BAR_STOCK.map(([id, price]) => ({
+    t: `${ITEMS[id].name.split(" ")[0]} ${price}`,
+    fn(){
+      if (G.crumbs < price){ say([{ t:"THE BARTENDER SLIDES YOUR CRUMBS BACK. 'COME BACK RICHER, SUGAR.'", fn: barShop }]); return; }
+      if (G.inv.length >= 8){ say([{ t:"'POCKETS FULL, HONEY. DRINK RESPONSIBLY, CARRY RESPONSIBLY.'", fn: barShop }]); return; }
+      G.crumbs -= price; G.inv.push(id); SFX.confirm();
+      say([{ t:`THE BARTENDER SLIDES YOU A ${ITEMS[id].name} WITHOUT LOOKING. SMOOTH.`, fn: barShop }]);
+    }
+  }));
+  choices.push({ t:"LEAVE", fn(){ say([{ t:"'STAY FUNKY OUT THERE.' THE BARTENDER POLISHES A GLASS THAT WAS ALREADY CLEAN." }]); } });
+  say([{ t:`WHAT'LL IT BE? (YOU HAVE ${G.crumbs} CRUMBS)`, choices }]);
+}
+
+// ---- ch3 enemies ----
+Object.assign(ENEMY_DEFS, {
+  staplergeist: {
+    name:"STAPLERGEIST", spr:staplerSpr, hp:85, atk:8, def:2, exp:32, crumbs:34, pattern:"staples",
+    check:"STAPLERGEIST - ATK 8 DEF 2. A STAPLER THAT DIED WITH UNFINISHED PAPERWORK. IT BINDS. IT HAUNTS.",
+    quotes:["COLLATE. COLLATE!!","YOU HAVE BEEN CC'D ON MY WRATH.","I ONCE HELD A 40-PAGE REPORT TOGETHER. ALONE.","CLICK-CHUNK."],
+    acts:[
+      { t:"REFILL", fn(e){ e.refilled = true; return "YOU SLIDE A FRESH ROW OF STAPLES INTO ITS TRAY. THE GHOST SHUDDERS WITH FULFILLMENT."; } },
+      { t:"FILE AWAY", fn(e){
+          if (e.refilled){ e.spareable = true; return "YOU STAMP ITS LAST REPORT 'DONE'. THE STAPLERGEIST'S BUSINESS IS FINISHED. IT CLICKS SOFTLY, AT PEACE."; }
+          return "IT CANNOT REST EMPTY. REFILL IT FIRST. OFFICE GHOSTS HAVE RULES."; } }
+    ],
+    killText:"THE STAPLERGEIST SCATTERS INTO LOOSE STAPLES. SOMEBODY IS GOING TO STEP ON THOSE.",
+    spareText:"THE STAPLERGEIST DRIFTS OFF TOWARD THE GREAT SUPPLY CLOSET IN THE SKY."
+  },
+  funkybass: {
+    name:"FUNKY BASS", spr:bassSpr, hp:110, atk:8, def:2, exp:40, crumbs:36, pattern:"funk",
+    check:"FUNKY BASS - ATK 8 DEF 2. AN UPRIGHT BASS WITH AN UPRIGHT ATTITUDE. THE GROOVE IS NON-NEGOTIABLE.",
+    quotes:["FEEL THAT? THAT'S THE POCKET, BABY.","I DON'T PLAY NOTES. I PLAY FEELINGS.","THE BAND NEVER STOPPED. THE OFFICE JUST JOINED IN.","DOOM. DOOM. DOOM-DOOM."],
+    acts:[
+      { t:"SLAP ALONG", fn(e){ e.slapped = true; return "YOU SLAP AN IMAGINARY BASS. YOUR FORM IS TERRIBLE. YOUR HEART IS PERFECT. THE BASS NODS."; } },
+      { t:"DROP THE BEAT", fn(e){
+          if (e.slapped){ e.spareable = true; return "YOU AND THE BASS HIT THE ONE TOGETHER. SOMEWHERE, A NEW GENRE IS BORN. IT'S DONE FIGHTING."; }
+          return "THE BASS REFUSES TO DROP WITH A STRANGER. SLAP ALONG FIRST. EARN THE POCKET."; } }
+    ],
+    killText:"THE FUNKY BASS UNSTRINGS. THE ROOM FEELS 30 PERCENT LESS COOL FOREVER.",
+    spareText:"THE FUNKY BASS SLIDES OFF STAGE ON ONE CORNER, IMPOSSIBLY SMOOTH."
+  },
+  drummachine: {
+    name:"DRUM MACHINE", spr:drumSpr, hp:95, atk:7, def:3, exp:38, crumbs:34, pattern:"drums",
+    check:"DRUM MACHINE - ATK 7 DEF 3. IT KEEPS PERFECT TIME. IT HAS KEPT PERFECT TIME SINCE 1987. IT IS SO TIRED.",
+    quotes:["BOOTS. CATS. BOOTS. CATS.","I HAVE ONE JOB AND IT NEVER ENDS.","QUANTIZED AND TRAUMATIZED.","PRESS PLAY. NOBODY EVER PRESSES STOP."],
+    acts:[
+      { t:"SYNC UP", fn(e){ e.synced = true; return "YOU CLAP ON THE OFFBEAT. THEN THE ONBEAT. THEN, MIRACULOUSLY, THE RIGHT BEAT. THE MACHINE BLINKS IN RESPECT."; } },
+      { t:"PRESS STOP", fn(e){
+          if (e.synced){ e.spareable = true; return "YOU REACH OVER AND PRESS STOP. THE DRUM MACHINE EXPERIENCES SILENCE FOR THE FIRST TIME IN DECADES. IT WEEPS IN 808."; }
+          return "IT WON'T LET AN OFF-BEAT STRANGER TOUCH THE CONTROLS. SYNC UP FIRST."; } }
+    ],
+    killText:"THE DRUM MACHINE PLAYS ONE FINAL FILL AND POWERS DOWN MID-",
+    spareText:"THE DRUM MACHINE RESTS. FOUR-FOUR TIME FLOWS ON WITHOUT IT, SOMEHOW."
+  },
+  megacomic: {
+    name:"POSSESSED COMIC", spr:comicSpr, hp:75, atk:8, def:1, exp:30, crumbs:26, pattern:"pow",
+    check:"POSSESSED COMIC - ATK 8 DEF 1. A VINTAGE ROBOT-HERO COMIC, ANIMATED BY PURE CONFISCATION RESENTMENT.",
+    quotes:["POW!! WHAM!! LEGAL ACTION!!","WE WERE MINT. WE WERE LOVED. WE WERE FILED UNDER 'MISC'.","ISSUE SEVEN NEVER FORGETS.","*DRAMATIC PAGE FLIP*"],
+    acts:[
+      { t:"READ", fn(e){ e.read = true; return "YOU READ A FEW PANELS ALOUD, DOING ALL THE VOICES. THE COMIC'S PAGES SLOW THEIR FLAPPING. IT MISSED THIS."; } },
+      { t:"BAG + BOARD", fn(e){
+          if (e.read){ e.spareable = true; return "YOU SLIP THE COMIC INTO A PROTECTIVE SLEEVE. IT SETTLES INSTANTLY. SAFE. PRESERVED. TREASURED."; }
+          return "IT THRASHES TOO HARD TO SLEEVE. READ IT FIRST. COMICS WANT TO BE READ."; } }
+    ],
+    killText:"THE COMIC TEARS ITSELF APART. THE FINAL PANEL JUST SAYS 'THE END?'. NOW IT'S JUST 'THE END'.",
+    spareText:"THE COMIC SLIDES INTO ITS SLEEVE AND GOES STILL, COVER GLEAMING."
+  },
+  rolly: {
+    name:"ROLLY THE ROLL", spr:rollySpr, hp:600, atk:11, def:3, exp:300, crumbs:250, pattern:"rolly",
+    check:"ROLLY - ATK 11 DEF 3. THE OFFICIAL PIZZA ROLL CORPORATION MASCOT. THE SMILE IS PAINTED ON. THE SUFFERING IS NOT.",
+    quotes:[],
+    acts:[
+      { t:"SMALL TALK", fn(e){ return "YOU ASK ROLLY ABOUT THE WEATHER. ROLLY RESPONDS WITH THE Q3 PRODUCT ROADMAP. WORD FOR WORD."; } },
+      { t:"ASK ABOUT PAY", fn(e){
+          e.mercy++;
+          if (e.mercy === 1) return "YOU ASK WHAT THE MASCOT GIG PAYS. ROLLY'S PAINTED SMILE STAYS. SOMETHING BEHIND THE EYES DOES NOT.";
+          e.askedPay = true;
+          return "YOU ASK AGAIN, GENTLY. FROM INSIDE THE COSTUME, VERY QUIETLY: 'EXPOSURE.'"; } },
+      { t:"UNZIP", fn(e){
+          if (e.askedPay){ e.spareable = true; return "YOU FIND THE ZIPPER. INSIDE IS AN INTERN NAMED JEREMY. HE HAS SEEN THINGS. HE IS ALMOST FREE."; }
+          return "THE ZIPPER IS CORPORATE-LOCKED. GET ROLLY TALKING ABOUT LABOR CONDITIONS FIRST."; } }
+    ],
+    killText:"THE COSTUME DEFLATES WITH A LONG, SAD WHEEZE. AN INTERN CRAWLS OUT, UNHARMED AND UNPAID.",
+    spareText:"JEREMY STEPS OUT OF THE COSTUME. HE IS 23. HE LOOKS 61. HE IS FREE."
+  }
+});
+Object.assign(GROUPS, {
+  disco1: ["staplergeist"], disco2: ["staplergeist", "staplergeist"],
+  band: ["funkybass", "drummachine"],
+  comics: ["megacomic", "megacomic"],
+  rollyFight: ["rolly"]
+});
+function checkRollyPhase(e){
+  const frac = e.hp / e.maxhp;
+  if (B.bossPhase === 1 && frac <= 0.66 && e.alive){
+    B.bossPhase = 2;
+    B.bossDlgQueue.push([
+      { t:"ROLLY: PLEASE ENJOY RESPONSIBLY. PLEASE. ENJOY. RESPONSIBLY." },
+      { t:"THE SMILE DOES NOT MOVE. THE SMILE NEVER MOVES." }
+    ]);
+  }
+  if (B.bossPhase === 2 && frac <= 0.33 && e.alive){
+    B.bossPhase = 3;
+    B.bossDlgQueue.push([
+      { t:"A MUFFLED VOICE FROM INSIDE THE COSTUME: 'I'VE BEEN IN HERE SINCE THE LAUNCH PARTY. WATER... PLEASE...'" },
+      { p:"mega", name:"MEGAFIRE", t:"THERE'S A PERSON IN THERE?! THERE'S BEEN A PERSON IN THERE THIS WHOLE TIME?!" },
+      { p:"bmo", name:"BMO", t:"IT'S ALWAYS A GUY IN A SUIT. EVERY TIME. GET HIM OUT." }
+    ]);
+  }
+}
+// ch3 bullet patterns (registered into the battle engine)
+Object.assign(EXTRA_PATTERNS, {
+  staples(e, t, spdMul, box){
+    if (t % 44 === 8){
+      aimShot(e, box, 2.3 * spdMul, "#c9c9d8", "pickle", 3);
+      if (e.maxhp - e.hp > 30) aimShot(e, box, 2.3 * spdMul, "#c9c9d8", "pickle", 3, 0.45);
+    }
+  },
+  funk(e, t, spdMul, box){
+    if (t % 12 === 0){
+      const a = t * 0.14 + e.seed;
+      spawnBullet({ x: box.x + box.w / 2, y: box.y + box.h / 2 - 14,
+        vx: Math.cos(a) * 1.25 * spdMul, vy: Math.sin(a) * 1.25 * spdMul, r: 4, dmg: e.atk, col:"#e8a030", kind:"ring" });
+    }
+    if (t % 70 === 30) aimShot(e, box, 1.8 * spdMul, "#e040c0", "ball", 4);
+  },
+  drums(e, t, spdMul, box){
+    // rows on the beat: left half, then right half — dodge to the rhythm
+    if (t % 64 === 16)
+      for (let x = box.x + 8; x < box.x + box.w / 2; x += 18)
+        spawnBullet({ x, y: box.y + 4, vx: 0, vy: 1.5 * spdMul, r: 4, dmg: e.atk, col:"#40e0d0", kind:"ball" });
+    if (t % 64 === 48)
+      for (let x = box.x + box.w / 2 + 8; x < box.x + box.w - 4; x += 18)
+        spawnBullet({ x, y: box.y + 4, vx: 0, vy: 1.5 * spdMul, r: 4, dmg: e.atk, col:"#e05858", kind:"ball" });
+  },
+  pow(e, t, spdMul, box){
+    if (t % 56 === 12){
+      const sx = box.x + 20 + rnd(0, box.w - 40), sy = box.y + 12;
+      for (let k = 0; k < 4; k++){
+        const a = Math.PI / 4 + k * Math.PI / 2;
+        spawnBullet({ x: sx, y: sy, vx: Math.cos(a) * 1.5 * spdMul, vy: Math.sin(a) * 1.5 * spdMul, r: 4, dmg: e.atk, col:"#ffe14a", kind:"chip" });
+      }
+    }
+    if (t % 48 === 30) aimShot(e, box, 2.1 * spdMul, "#f2ede8", "ball", 3);
+  }
+});
+function rollyPattern(e, t, spdMul){
+  const box = B.box, ph = B.bossPhase;
+  if (t % (ph === 1 ? 42 : 56) === 8){
+    aimShot(e, box, 2.2 * spdMul, "#c04838", "ball", 4);
+    if (ph >= 2) aimShot(e, box, 2.2 * spdMul, "#c04838", "ball", 4, 0.5);
+  }
+  if (t % 46 === 24){
+    const gap = (Math.sin(t * 0.02 + e.seed) * 0.5 + 0.5) * (box.w - 44) + box.x + 22;
+    for (let x = box.x + 8; x < box.x + box.w - 4; x += 22)
+      if (Math.abs(x - gap) >= 18)
+        spawnBullet({ x, y: box.y + 4, vx: 0, vy: 1.35 * spdMul, r: 4, dmg: e.atk, col:"#f5cd7a", kind:"ball" });
+  }
+  if (ph >= 2 && t % 14 === 0){
+    const a = t * 0.16;
+    spawnBullet({ x: box.x + box.w / 2, y: box.y + box.h / 2 - 10,
+      vx: Math.cos(a) * 1.3 * spdMul, vy: Math.sin(a) * 1.3 * spdMul, r: 3, dmg: e.atk, col:"#e040c0", kind:"ring" });
+  }
+  if (ph >= 3){
+    if (t % 90 === 40 && B.bullets.filter(b => b.kind === "bounce").length < 3)
+      spawnBullet({ x: box.x + 20, y: box.y + 12, vx: 1.6 * spdMul, vy: 1.4 * spdMul, r: 6, dmg: e.atk + 1, col:"#c07830", kind:"bounce", life: 280 });
+    if (t % 140 === 70)
+      spawnBullet({ x: box.x + box.w - 10, y: box.y + 8, vx: -0.5, vy: 0.5, r: 5, dmg: e.atk + 2, col:"#ffffff", kind:"homing", life: 250 });
+  }
+}
+
+// ---- ch3 barriers ----
+const CH3_BARRIERS = [
+  { room:"lounge", rect:{ x:400, y:52, w:26, h:134 }, flag:"mgHelp1" },
+  { room:"stage",  rect:{ x:420, y:70, w:14, h:170 }, flag:"bandDone" },
+  { room:"stage",  rect:{ x:546, y:96, w:16, h:56 }, flag:"boardroomOpen" }
+];
+
+// ---- ch3 rooms ----
+Object.assign(ROOMS, {
+  discolobby: {
+    w: 320, h: 240, music: "disco", dark: true,
+    floor: "#241428",
+    walls: [
+      { x:0, y:0, w:320, h:70 }, { x:0, y:226, w:320, h:14 },
+      { x:0, y:0, w:14, h:240 },
+      { x:306, y:0, w:14, h:120 }, { x:306, y:176, w:14, h:64 },
+      { x:110, y:70, w:100, h:26 }  // reception desk
+    ],
+    deco(){
+      discoFloor(320, 240);
+      wallFace(0, 0, 320, 70, "#180c1c", "#2c1830");
+      discoBall(160, 12);
+      // reception desk
+      ctx.fillStyle = "#5a3c28"; ctx.fillRect(110, 70, 100, 26);
+      ctx.fillStyle = "#7a5438"; ctx.fillRect(114, 74, 92, 18);
+      drawTextC("PIZZA ROLL CORP.", 160, 24, "#f5cd7a");
+      drawTextC("SYNERGY. ROLLS. SECRECY.", 160, 36, "#8a5fb0");
+    },
+    npcs: [
+      { id:"deskbell", x:160, y:102, spr:null, w:16, h:10, sign:true, noDraw:true,
+        dlg(){ return [
+          { t:"YOU RING THE RECEPTION BELL. IT PLAYS A FUNKY LITTLE LICK INSTEAD OF A DING." },
+          { p:"dorko", name:"DORKO", t:"EVEN THE BELL HAS GONE DISCO. STAY SHARP." }
+        ]; } }
+    ],
+    saves: [ { x:60, y:190 } ],
+    exits: [ { x:312, y:120, w:8, h:56, to:"discobar", tx:26, ty:150, dir:"right" } ],
+    spawns: []
+  },
+  discobar: {
+    w: 560, h: 300, music: "disco", dark: false,
+    floor: "#2a1830",
+    walls: [
+      { x:0, y:0, w:560, h:70 }, { x:0, y:286, w:560, h:14 },
+      { x:0, y:0, w:14, h:120 }, { x:0, y:176, w:14, h:124 },
+      { x:550, y:0, w:14, h:120 }, { x:550, y:176, w:14, h:124 },
+      { x:100, y:70, w:220, h:28 }  // bar counter
+    ],
+    deco(){
+      discoFloor(560, 300);
+      wallFace(0, 0, 560, 70, "#1c1020", "#301c38");
+      discoBall(280, 12);
+      // bar counter + bottles
+      ctx.fillStyle = "#5a3c28"; ctx.fillRect(100, 70, 220, 28);
+      ctx.fillStyle = "#7a5438"; ctx.fillRect(104, 74, 212, 8);
+      ["#e05858", "#58c858", "#58a0e0", "#ffe14a", "#e040c0"].forEach((c, i) => {
+        ctx.fillStyle = c; ctx.fillRect(120 + i * 38, 52, 8, 16);
+      });
+      drawTextC("THE WATERING HOLE PUNCH", 210, 40, "#f5cd7a");
+      // lounge sofas
+      ctx.fillStyle = "#6a2848"; ctx.fillRect(400, 90, 70, 22);
+      ctx.fillStyle = "#8a3c60"; ctx.fillRect(404, 94, 62, 14);
+    },
+    npcs: [
+      { id:"bartender", x:210, y:110, spr:butterSpr, w:14, h:10, solid:true, name:"BARKEEP",
+        dlg(){ return [{ t:"THE BARTENDER IS A BUTTER GOLEM IN A BOW TIE. HE NODS AT THE TAPS.", fn: barShop }]; } },
+      { id:"manager", x:440, y:130, spr:congoerSpr, w:10, h:12, solid:true, name:"MIDDLE MANAGER",
+        dlg(n){
+          return n % 2 ? [{ t:"MIDDLE MANAGER: WHEN THE LIGHTS WENT OUT, SOMETHING IN ME WOKE UP. I HAVEN'T FILED A REPORT IN HOURS. I FEEL ALIVE." }]
+                       : [{ t:"MIDDLE MANAGER: THE BAND PLAYS ON THE STAGE FLOOR, PAST THE LOUNGE. THEY DON'T TAKE REQUESTS. THEY TAKE PRISONERS." }];
+        } },
+      { id:"hrowl", x:80, y:200, spr:eggbertSpr, w:12, h:12, solid:true, name:"H.R.",
+        dlg(n){
+          return n % 2 ? [{ t:"H.R.: TECHNICALLY THIS PARTY VIOLATES SEVENTEEN POLICIES. TECHNICALLY I WROTE THEM. TECHNICALLY I'M DANCING." }]
+                       : [{ t:"H.R.: THE MASCOT? ROLLY? OH, WE DON'T TALK ABOUT ROLLY'S CONTRACT. IT PREDATES LABOR LAW." }];
+        } },
+      { id:"mg1", x:480, y:230, spr:mgSpr, w:12, h:12, solid:true, name:"MG", hideFlag:"mgHelp1",
+        dlg(n){
+          if (n === 0) return [
+            { p:"mg", name:"MG", t:"NAME'S MG. GREY LIZARD, GREEN ARMOR, GREAT AIM. I'M HERE FOR MY MEGAMAN COMICS." },
+            { p:"mg", name:"MG", t:"ISSUES ONE THROUGH SEVEN. MINT-ISH. THE CORPORATION CONFISCATED THEM AS 'UNAUTHORIZED HEROICS'." },
+            { p:"mg", name:"MG", t:"STICK WITH ME. I'M GREAT AT REMOVING OBSTACLES. IT'S KIND OF MY WHOLE BUILD." },
+            { p:"bmo", name:"BMO", t:"AN ESCORT MISSION WHERE THE NPC ESCORTS US? I LOVE THIS GUY ALREADY." }
+          ];
+          return [{ p:"mg", name:"MG", t:"THE LOUNGE IS EAST. IF ANYTHING'S IN OUR WAY, I'VE GOT A CANNON WITH ITS NAME ON IT. THE CANNON'S NAME IS ALSO MG." }];
+        } }
+    ],
+    saves: [ { x:280, y:190 } ],
+    exits: [
+      { x:0, y:120, w:8, h:56, to:"discolobby", tx:290, ty:148, dir:"left" },
+      { x:552, y:120, w:8, h:56, to:"lounge", tx:26, ty:110, dir:"right" }
+    ],
+    spawns: []
+  },
+  lounge: {
+    w: 640, h: 200, music: "disco", dark: true,
+    floor: "#241428",
+    walls: [
+      { x:0, y:0, w:640, h:52 }, { x:0, y:186, w:640, h:14 },
+      { x:0, y:0, w:14, h:82 }, { x:0, y:138, w:14, h:62 },
+      { x:630, y:0, w:14, h:82 }, { x:630, y:138, w:14, h:62 },
+      { x:120, y:120, w:60, h:20 }, { x:250, y:60, w:60, h:20 }
+    ],
+    deco(){
+      discoFloor(640, 200);
+      wallFace(0, 0, 640, 52, "#180c1c", "#2c1830");
+      discoBall(160, 8); discoBall(480, 8);
+      // bean bags and sofas
+      ctx.fillStyle = "#6a2848"; ctx.fillRect(120, 120, 60, 20);
+      ctx.fillStyle = "#8a3c60"; ctx.fillRect(124, 124, 52, 12);
+      ctx.fillStyle = "#284868"; ctx.fillRect(250, 60, 60, 20);
+      ctx.fillStyle = "#3c6088"; ctx.fillRect(254, 64, 52, 12);
+      // the box stack obstacle
+      if (!G.flags.mgHelp1){
+        ctx.fillStyle = "#8a6a3c";
+        for (let by2 = 56; by2 < 182; by2 += 26){
+          ctx.fillRect(400, by2, 26, 24);
+          ctx.fillStyle = "#a8854c"; ctx.fillRect(403, by2 + 3, 20, 18); ctx.fillStyle = "#8a6a3c";
+        }
+        drawTextC("FILES", 413, 100, "#5c4a2e");
+      } else {
+        // confetti remains
+        ctx.fillStyle = "#a8854c";
+        [[396,170],[410,176],[422,168],[404,160]].forEach(([x, y]) => ctx.fillRect(x, y, 6, 4));
+      }
+      drawTextC("EMPLOYEE LOUNGE", 320, 30, "#8a5fb0");
+    },
+    npcs: [
+      { id:"mg2", x:372, y:120, spr:mgSpr, w:12, h:12, solid:true, name:"MG", hideFlag:"mgHelp1", needFlag:"ch3",
+        dlg(){ return [
+          { p:"mg", name:"MG", t:"BOXES. WHY IS IT ALWAYS BOXES. STAND BACK, I'VE TRAINED MY WHOLE LIFE FOR EXACTLY THIS." },
+          { t:"MG'S ARM WHIRS AND RECONFIGURES INTO A CANNON. IT CHARGES WITH A RISING WHINE.",
+        fn(){
+            tone(200, 0.9, "square", 0.15, 1400);
+            setTimeout(() => { SFX.boom(); shake(5, 14); }, 900);
+            setTimeout(() => {
+              G.flags.mgHelp1 = 1;
+              say([
+                { t:"BWOOM. THE BOXES ARE NOW CONFETTI. NONE OF THEM CONTAINED COMICS." },
+                { p:"mg", name:"MG", t:"...NOTED. ONWARD. THE STAGE IS EAST. I'LL SCOUT AHEAD." },
+                { t:"MG DASHES OFF, SLIDING UNDER NOTHING IN PARTICULAR. IT LOOKS EXTREMELY COOL." }
+              ]);
+            }, 1100);
+          } }
+        ]; } },
+      { id:"sign_lounge", x:60, y:100, spr:null, w:16, h:12, sign:true,
+        dlg(){ return [{ t:"MOTIVATIONAL POSTER: A CAT HANGING FROM A DISCO BALL. 'HANG IN THERE. FUNKILY.'" }]; } }
+    ],
+    saves: [],
+    exits: [
+      { x:0, y:82, w:8, h:56, to:"discobar", tx:526, ty:148, dir:"left" },
+      { x:632, y:82, w:8, h:56, to:"stage", tx:26, ty:150, dir:"right" }
+    ],
+    spawns: [
+      { id:"lg_stap", x:200, y:100, spr:staplerSpr, group:"disco1",
+        patrol:{ axis:"x", range:36, spd:0.025 }, flag:"e_lg1" },
+      { id:"lg_stap2", x:520, y:150, spr:staplerSpr, group:"disco2",
+        patrol:{ axis:"y", range:20, spd:0.03 }, flag:"e_lg2" }
+    ]
+  },
+  stage: {
+    w: 560, h: 240, music: "disco", dark: true,
+    floor: "#1c1024",
+    walls: [
+      { x:0, y:0, w:560, h:70 }, { x:0, y:226, w:560, h:14 },
+      { x:0, y:0, w:14, h:120 }, { x:0, y:176, w:14, h:64 },
+      { x:546, y:0, w:14, h:96 }, { x:546, y:152, w:14, h:88 },
+      { x:120, y:70, w:200, h:30 }  // stage platform
+    ],
+    deco(){
+      discoFloor(560, 240);
+      wallFace(0, 0, 560, 70, "#180c1c", "#2c1830");
+      discoBall(280, 10);
+      // stage
+      ctx.fillStyle = "#3c2444"; ctx.fillRect(120, 70, 200, 30);
+      ctx.fillStyle = "#54325e"; ctx.fillRect(126, 74, 188, 20);
+      drawTextC("TONIGHT: THE QUARTERLY EARNINGS", 280, 40, "#f5cd7a");
+      if (!G.flags.bandDone){
+        drawSpr(bassSpr, 170, 62, {});
+        drawSpr(drumSpr, 240, 68, {});
+      }
+      // velvet rope
+      if (!G.flags.bandDone){
+        ctx.fillStyle = "#c9a05c"; ctx.fillRect(420, 74, 4, 112); ctx.fillRect(420, 178, 4, 8);
+        ctx.fillStyle = "#a83050";
+        for (let ry = 80; ry < 180; ry += 14) ctx.fillRect(418, ry, 8, 7);
+      }
+      // backstage door
+      ctx.fillStyle = "#3c2a1c"; ctx.fillRect(544, 100, 14, 48);
+      if (!G.flags.boardroomOpen){
+        ctx.fillStyle = "#e05858"; ctx.fillRect(548, 118, 6, 6);
+      } else {
+        ctx.fillStyle = "#58c858"; ctx.fillRect(548, 118, 6, 6);
+      }
+      // lost + found
+      if (G.flags.bandDone){
+        ctx.fillStyle = "#4a5a6c"; ctx.fillRect(470, 60, 44, 30);
+        ctx.fillStyle = "#5c7084"; ctx.fillRect(474, 64, 36, 22);
+        drawTextC("LOST+FOUND", 492, 50, "#8a93a8");
+      }
+    },
+    npcs: [
+      { id:"bandmic", x:220, y:110, spr:null, w:20, h:12, sign:true, noDraw:true, hideFlag:"bandDone",
+        dlg(){ return [
+          { t:"THE BAND STRIKES A POSE. THE BASS SPEAKS FIRST, WHICH IS UNUSUAL FOR A BASS." },
+          { t:"FUNKY BASS: NOBODY CROSSES THE ROPE DURING OUR SET. HOUSE RULES. FUNK RULES." },
+          { p:"dorko", name:"DORKO", t:"WE'RE ON A SCHEDULE. AND YOUR SET LIST IS ABOUT TO BE AN OBITUARY. OR A COLLAB. YOUR CALL." },
+          { fn(){ startBattle("band", "bandDone"); }, t:"THE QUARTERLY EARNINGS DROP THE BEAT. ON YOU." }
+        ]; } },
+      { id:"mg3", x:470, y:110, spr:mgSpr, w:12, h:12, solid:true, name:"MG", needFlag:"bandDone", hideFlag:"comicsDone",
+        dlg(){ return [
+          { p:"mg", name:"MG", t:"THERE. THE LOST + FOUND. MY COMICS ARE IN THERE, I CAN FEEL IT. E-TANKS DON'T LIE." },
+          { t:"OPEN THE LOST + FOUND?", choices:[
+            { t:"OPEN IT", fn(){
+                say([
+                  { t:"YOU LIFT THE LID. SEVEN COMIC BOOKS FLUTTER OUT... AND HOVER. MENACINGLY." },
+                  { p:"mg", name:"MG", t:"MY COMICS! THEY'VE COME TO LIFE! ...THIS IS THE COOLEST WORST THING THAT'S EVER HAPPENED TO ME." },
+                  { fn(){ startBattle("comics", "comicsDone"); }, t:"THE COMICS ATTACK, PANELS FIRST!" }
+                ]);
+              } },
+            { t:"NOT YET", fn(){ say([{ p:"mg", name:"MG", t:"TAKE YOUR TIME. THEY'VE WAITED IN A BOX. THEY CAN WAIT IN A BOX SLIGHTLY LONGER." }]); } }
+          ] }
+        ]; } },
+      { id:"mg4", x:470, y:110, spr:mgSpr, w:12, h:12, solid:true, name:"MG", needFlag:"comicsDone",
+        dlg(){
+          if (G.flags.comicsSpared) return [{ p:"mg", name:"MG", t:"BAGGED. BOARDED. BELOVED. BEST DAY OF MY LIFE. GO GET THAT MASCOT." }];
+          return [{ p:"mg", name:"MG", t:"...I TAPED THE PAGES BACK TOGETHER. IT'S A READER'S COPY NOW. IT'S FINE. GO GET THAT MASCOT." }];
+        } }
+    ],
+    saves: [ { x:60, y:200 } ],
+    exits: [
+      { x:0, y:120, w:8, h:56, to:"lounge", tx:606, ty:110, dir:"left" },
+      { x:552, y:96, w:8, h:56, to:"boardroom", tx:30, ty:150, dir:"right" }
+    ],
+    spawns: []
+  },
+  boardroom: {
+    w: 320, h: 240, music: "disco", dark: true,
+    floor: "#241428",
+    walls: [
+      { x:0, y:0, w:320, h:70 }, { x:0, y:226, w:320, h:14 },
+      { x:0, y:0, w:14, h:240 }, { x:306, y:0, w:14, h:240 },
+      { x:100, y:110, w:120, h:30 }  // the long table
+    ],
+    deco(){
+      discoFloor(320, 240);
+      wallFace(0, 0, 320, 70, "#180c1c", "#2c1830");
+      discoBall(160, 10);
+      drawTextC("BOARDROOM", 160, 22, "#f5cd7a");
+      drawTextC("ALL DECISIONS FINAL. ESPECIALLY BAD ONES.", 160, 34, "#8a5fb0");
+      // conference table
+      ctx.fillStyle = "#5a3c28"; ctx.fillRect(100, 110, 120, 30);
+      ctx.fillStyle = "#7a5438"; ctx.fillRect(106, 114, 108, 22);
+      if (!G.flags.rollyDone) drawSpr(rollySpr, 147, 60, {});
+      if (G.flags.rollyDone){
+        // the confiscated rolls, returned
+        drawSpr(rollSpr, 130, 118, {}); drawSpr(rollSpr, 155, 120, {}); drawSpr(rollSpr, 180, 118, {});
+      }
+    },
+    npcs: [
+      { id:"rollyboss", x:160, y:96, spr:null, w:26, h:14, sign:true, noDraw:true,
+        dlg(){ return G.flags.rollyDone ? finalHomeScript() : preRollyScript(); } },
+      { id:"jeremy", x:240, y:190, spr:congoerSpr, w:10, h:12, solid:true, name:"JEREMY", needFlag:"rollyDone",
+        dlg(){ return [
+          { t:"JEREMY: I GET TO GO HOME. I GET TO SEE THE SUN. I GET TO... FILE A COMPLAINT. SO MANY COMPLAINTS." },
+          { t:"JEREMY SHREDS THE 'UNAUTHORIZED PIZZA ROLL OWNERSHIP' POLICY ON HIS WAY OUT. HE IS THRIVING." }
+        ]; } }
+    ],
+    saves: [],
+    exits: [ { x:0, y:120, w:8, h:56, to:"stage", tx:526, ty:120, dir:"left" } ],
+    spawns: []
+  }
+});
+// disco deco helpers — slow, gentle color cycling only (no strobing)
+function discoFloor(w, h){
+  const pal = ["#2c1838", "#301c30", "#28203c", "#341c34"];
+  for (let y = 0; y < h; y += 24)
+    for (let x = 0; x < w; x += 24){
+      const idx = (x / 24 + y / 24 + Math.floor(G.t / 60)) % 4;
+      ctx.fillStyle = pal[idx];
+      ctx.fillRect(x, y, 24, 24);
+    }
+}
+function discoBall(x, y){
+  ctx.fillStyle = "#8a93a8"; ctx.fillRect(x - 1, y - 6, 2, 6);
+  ctx.fillStyle = "#c9c9d8"; ctx.beginPath(); ctx.arc(x, y + 6, 8, 0, 7); ctx.fill();
+  ctx.fillStyle = "#e8e8f0";
+  for (let i = 0; i < 4; i++){
+    const a = G.t / 40 + i * 1.57;
+    ctx.fillRect(x + Math.cos(a) * 5 - 1, y + 6 + Math.sin(a) * 5 - 1, 2, 2);
+  }
+}
+
+// ---- ch3 story scripts ----
+function ransackedScript(){
+  return [
+    { t:"YOU PULL INTO THE DRIVEWAY AS THE SUN COMES UP. THE FRONT DOOR IS OFF ITS HINGES." },
+    { t:"THE LIVING ROOM HAS BEEN TURNED UPSIDE DOWN. THE COUCH CUSHIONS HAVE BEEN... FRISKED." },
+    { t:"A NOTICE IS STAPLED TO THE WALL: 'PREMISES SEARCHED UNDER SUSPICION OF UNAUTHORIZED PIZZA ROLL OWNERSHIP. - PIZZA ROLL CORPORATION, LEGAL DEPT.'" },
+    { p:"mega", name:"MEGAFIRE", t:"THEY TOOK THE LEFTOVERS. WHO RAIDS A HOUSE AND TAKES THE LEFTOVERS?!" },
+    { p:"bmo", name:"BMO", t:"UNAUTHORIZED?! WE FOUND THOSE ROLLS FAIR AND SQUARE! IN A MAGICAL FRIDGE DIMENSION! WHICH IS A NORMAL PLACE TO FIND FOOD!" },
+    { p:"dorko", name:"DORKO", t:"..." },
+    { t:"DORKO SILENTLY GRABS EVERYONE BY THE ARM." },
+    { p:"dorko", name:"DORKO", t:"CAR. NOW.",
+      fn(){
+        SFX.encounter();
+        say([
+          { t:"ONE FURIOUS DRIVE LATER: PIZZA ROLL CORPORATION WORLD HEADQUARTERS. FLOOR 1 OF 44." },
+          { t:"DORKO KICKS THE REVOLVING DOOR. IT REVOLVES. HE ENTERS ANYWAY, DRAMATICALLY." },
+          { t:"AND THEN - THE LIGHTS TURN OFF." },
+          { p:"mega", name:"MEGAFIRE", t:"OH COME ON. THREE TIMES?! WHO KEEPS DOING THIS?!" },
+          { t:"THE DARKNESS SMELLS LIKE FOG MACHINE AND QUARTERLY REPORTS. SOMEWHERE, A BASSLINE BEGINS.",
+            fn(){
+              G.flags.ch3 = 1;
+              enterRoom("discolobby", 60, 150, true);
+              saveGame();
+            } }
+        ]);
+      } }
+  ];
+}
+function preRollyScript(){
+  return [
+    { t:"AT THE HEAD OF THE TABLE STANDS ROLLY, THE PIZZA ROLL CORPORATION MASCOT. SEVEN FEET OF SMILING CRUST." },
+    { t:"ROLLY: WELCOME, VALUED CONSUMERS! YOUR CONFISCATED ASSETS ARE BEING PROCESSED FOR BRAND SAFETY!" },
+    { p:"dorko", name:"DORKO", t:"THOSE ROLLS ARE FAMILY. HAND THEM OVER." },
+    { t:"ROLLY: OWNERSHIP IS A LICENSE, AND YOURS HAS BEEN REVOKED! PLEASE ENJOY THIS COMPLIMENTARY BEATDOWN!" },
+    { p:"bmo", name:"BMO", t:"FINAL FINAL BOSS. FOR REAL THIS TIME. I CAN FEEL IT." },
+    { fn(){ startBattle("rollyFight", null); }, t:"ROLLY VAULTS ONTO THE TABLE, GLOVES UP!" }
+  ];
+}
+function postRollyScript(){
+  if (G.flags.rollySpared){
+    return [
+      { t:"JEREMY PEELS OFF THE COSTUME'S ARMS. UNDERNEATH, HE'S WEARING A LANYARD THAT JUST SAYS 'INTERN (UNPAID)'." },
+      { p:"mega", name:"MEGAFIRE", t:"YOU'RE FREE NOW, JEREMY. NO ONE CAN MAKE YOU SMILE ON COMMAND EVER AGAIN." },
+      { t:"JEREMY HANDS OVER A CRATE MARKED 'CONFISCATED'. YOUR ROLLS. MG'S COMICS WERE UNDERNEATH, USED AS PADDING." },
+      { t:"THE LIGHTS COME BACK, FLOOR BY FLOOR. THE DISCO BALL KEEPS SPINNING. SOME THINGS SHOULD STAY." }
+    ];
+  }
+  return [
+    { t:"THE EMPTY COSTUME LIES ACROSS THE TABLE LIKE A DEFLATED QUARTERLY TARGET." },
+    { t:"JEREMY, FREED, HANDS OVER A CRATE MARKED 'CONFISCATED'. YOUR ROLLS. MG'S COMICS WERE UNDERNEATH, USED AS PADDING." },
+    { p:"bmo", name:"BMO", t:"WE DID A CORPORATE RESTRUCTURING. WITH VIOLENCE." },
+    { t:"THE LIGHTS COME BACK, FLOOR BY FLOOR. THE DISCO BALL KEEPS SPINNING. NOBODY TURNS IT OFF." }
+  ];
+}
+function postComicsScript(){
+  const spared = G.flags.comicsSpared;
+  return [
+    spared ? { p:"mg", name:"MG", t:"BAGGED AND BOARDED. ALL SEVEN. YOU BEAUTIFUL, WELL-PRESERVED MENACES." }
+           : { p:"mg", name:"MG", t:"...I'LL TAPE THEM. A READER'S COPY IS STILL A COPY YOU CAN READ. IT'S FINE. I'M FINE." },
+    { p:"mg", name:"MG", t:"DEBT'S A DEBT. THAT BOARDROOM DOOR? WATCH THIS." },
+    { t:"MG'S CANNON WHINES, THEN BWOOMS. THE BACKSTAGE DOOR IS NOW A BACKSTAGE ARCHWAY.",
+      fn(){
+        SFX.boom(); shake(5, 14);
+        G.flags.boardroomOpen = 1;
+        say([{ p:"mg", name:"MG", t:"GO FINISH THIS. I'D COME WITH, BUT SOMEONE HAS TO GUARD THE COMICS. FOREVER. IT'S ME. BY CHOICE." }]);
+      } }
+  ];
+}
+function finalHomeScript(){
+  return [
+    { t:"THE BOARDROOM IS QUIET. THE CRATE OF ROLLS SITS ON THE TABLE, WARM SOMEHOW." },
+    { t:"TAKE THE ROLLS AND GO HOME? FOR REAL THIS TIME?", choices:[
+      { t:"GO HOME", fn(){
+          say([
+            { p:"dorko", name:"DORKO", t:"THREE DARK WORLDS. ONE FAMILY OF ROLLS. WE'RE DONE. WE'RE ACTUALLY DONE." },
+            { p:"mega", name:"MEGAFIRE", t:"I'M GOING TO SLEEP FOR A WEEK. THEN I'M VISITING EVERYONE. THE FRIDGE. THE PIT. EVEN THE STAPLER." },
+            { p:"bmo", name:"BMO", t:"CREDITS. ROLL THEM. I'VE EARNED THIS PUN THREE TIMES OVER." },
+            { t:"YOU DRIVE HOME IN THE MORNING LIGHT, ROLLS ON EVERY LAP. THE HOUSE IS A MESS. IT'S YOURS. IT'S PERFECT." }
+          ], () => {
+            G.flags.ch3Done = 1;
+            G.flags.endRoute = endRoute();
+            saveGame();
+            stopMusic();
+            G.mode = "end"; G.endTimer = 0;
+            playJingle("victory");
+          });
+        } },
+      { t:"NOT YET", fn(){ say([{ p:"bmo", name:"BMO", t:"SURE. ONE MORE LAP AROUND THE DISCO. FOR THE ROAD." }]); } }
+    ] }
+  ];
+}
 
 // ================= STORY / CUTSCENES =================
 function newGame(){
@@ -4653,7 +5377,8 @@ function drawEnd(){
             : route === "violent" ? ["THE COLD ENDING", "#9fd8f0"]
             : ["THE SNACK ENDING", "#ffe14a"];
   drawTextC(sub[0], 160, 36, sub[1]);
-  if (G.flags.ch2Done) drawTextC("CHAPTERS 1 + 2 COMPLETE", 160, 46, "#e040c0");
+  if (G.flags.ch3Done) drawTextC("CHAPTERS 1 + 2 + 3 COMPLETE", 160, 46, "#e040c0");
+  else if (G.flags.ch2Done) drawTextC("CHAPTERS 1 + 2 COMPLETE", 160, 46, "#e040c0");
   // everyone you kept takes a bow
   const lineup = [dorkoFront, megaFront, bmoFront];
   if (route === "pacifist"){
@@ -4668,7 +5393,11 @@ function drawEnd(){
     lineup.push(syxSpr);
     if (G.flags.ballpitSpared && route !== "violent") lineup.push(congoerSpr);
   }
-  const gap = 6;
+  if (G.flags.ch3Done){
+    lineup.push(mgSpr);
+    if (G.flags.rollySpared && route !== "violent") lineup.push(rollySpr);
+  }
+  const gap = lineup.length > 10 ? 3 : 6;
   const totalW = lineup.reduce((a, s) => a + s.width, 0) + gap * (lineup.length - 1);
   let lx = 160 - totalW / 2;
   lineup.forEach((s, i) => {
