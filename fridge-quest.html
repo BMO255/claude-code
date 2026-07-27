@@ -1136,6 +1136,7 @@ function prepNode(){
   d.lines = wrapText(n.t, maxChars);
   d.total = d.lines.join(" ").length;
   d.chars = 0; d.choiceIdx = 0;
+  if (n.sfx) n.sfx();
 }
 function updateDialog(){
   const d = G.dialog, n = d.script[d.i];
@@ -2370,23 +2371,23 @@ function hpBar(x, y, w, hp, maxhp, col){
 function drawWorldMenu(){
   const m = G.menu;
   const np = G.party.length;
-  drawBox(180, 8, 134, 30 + np * 26);
+  drawBox(176, 8, 140, 44 + np * 26);
   G.party.forEach((p, i) => {
     const y = 16 + i * 26;
-    drawText(p.name, 188, y, p.col);
-    hpBar(188, y + 9, 80, p.hp, p.maxhp);
+    drawText(p.name, 184, y, p.col);
+    hpBar(184, y + 9, 84, p.hp, p.maxhp);
     drawText(`${p.hp}/${p.maxhp}`, 272, y + 8, "#c9c9d8");
   });
-  const infoY = 18 + np * 26;
-  drawText(`TP ${Math.round(G.tp)}%`, 188, infoY, "#f0a030");
-  hpBar(230, infoY + 1, 50, G.tp, 100, "#f0a030");
-  drawText(`CRUMBS ${G.crumbs}`, 188, infoY + 12, "#ffe14a");
-  drawText(`LV ${G.lv}`, 282, infoY + 12, "#c9c9d8");
-  const menuY = 42 + np * 26;
-  drawBox(180, menuY, 134, 34);
+  const infoY = 20 + np * 26;
+  drawText(`TP ${Math.round(G.tp)}%`, 184, infoY, "#f0a030");
+  hpBar(230, infoY + 1, 54, G.tp, 100, "#f0a030");
+  drawText(`CRUMBS ${G.crumbs}`, 184, infoY + 14, "#ffe14a");
+  drawText(`LV ${G.lv}`, 282, infoY + 14, "#c9c9d8");
+  const menuY = 58 + np * 26;
+  drawBox(176, menuY, 140, 34);
   ["ITEMS", "CLOSE"].forEach((s, i) => {
-    drawText(s, 200, menuY + 8 + i * 11, m.view === "main" && m.sel === i ? "#ffe14a" : "#c9c9d8");
-    if (m.view === "main" && m.sel === i) ctx.drawImage(soulSpr, 190, menuY + 9 + i * 11);
+    drawText(s, 198, menuY + 8 + i * 11, m.view === "main" && m.sel === i ? "#ffe14a" : "#c9c9d8");
+    if (m.view === "main" && m.sel === i) ctx.drawImage(soulSpr, 188, menuY + 9 + i * 11);
   });
   if (m.view === "items" || m.view === "target"){
     drawBox(30, 8, 144, 24 + Math.max(1, G.inv.length) * 11);
@@ -2565,13 +2566,13 @@ function startBattle(groupId, flag){
     bullets:[], fx:[], dmgNums:[],
     fightX:0, fightDone:false, fightTargets:[],
     phaseT:0, phaseLen:400, slowNext:1, curSlow:1,
-    bossPhase:1, bossDlgQueue:[], canFlee: !["tut", "boss", "kongyFight", "secret", "ballpitFight", "rollyFight", "gatorFight", "doughmerFight"].includes(groupId),
+    bossPhase:1, bossDlgQueue:[], canFlee: !["tut", "boss", "kongyFight", "secret", "ballpitFight", "rollyFight", "gatorFight", "doughmerFight", "mcronaldFight"].includes(groupId),
     tutorial: groupId === "tut", tutHintT:0,
     rewardExp:0, rewardCrumbs:0, endFlavor:""
   };
   G.mode = "battle";
   SFX.encounter();
-  playMusic(["boss", "secret", "ballpitFight", "rollyFight", "gatorFight", "doughmerFight"].includes(groupId) ? "boss" : "battle");
+  playMusic(["boss", "secret", "ballpitFight", "rollyFight", "gatorFight", "doughmerFight", "mcronaldFight"].includes(groupId) ? "boss" : "battle");
   B.msg = B.tutorial ? "A WILD GHERKIN JIGGLES INTO YOUR PATH!"
         : groupId === "boss" ? "KING GLACION DESCENDS FROM HIS FROSTBITTEN THRONE!"
         : groupId === "kongyFight" ? "KONGY GORGONZOLA BEATS HIS MAGNIFICENT CHEST!"
@@ -2582,6 +2583,8 @@ function startBattle(groupId, flag){
         : groupId === "comics" ? "SEVEN ISSUES OF PURE RESENTMENT TAKE WING!"
         : groupId === "gatorFight" ? "SNAPJAW EXPLODES OUT OF THE POOL, JAWS FIRST!"
         : groupId === "doughmerFight" ? "DOUGHMER RISES LIKE DOUGH. SLOWLY, THEN ALL AT ONCE!"
+        : groupId === "mcronaldFight" ? "DONALD MCRONALD SPRINGS FROM THE BALL PIT, POSING WITH TERRIBLE JOY!"
+        : G.flags.ch6 ? pick(["SOMETHING SIZZLES WITH UNEARNED CONFIDENCE!", "THE VALUE MENU ATTACKS!", "IT SMELLS LIKE GREASE AND UNRESOLVED FEELINGS!"])
         : G.flags.ch5 ? pick(["A CORRUPTED CLIP CRAWLS OUT OF THE TIMELINE!", "THE SERVERS HISS WITH UNENCODED MENACE!", "SOMETHING BUFFERS AGGRESSIVELY IN YOUR DIRECTION!"])
         : G.flags.ch4 ? pick(["SOMETHING RUSTLES IN THE MUCK!", "THE PIPES GURGLE A WARNING!", "IT SMELLS LIKE TROUBLE. AND WORSE."])
         : G.flags.ch3 ? pick(["THE DISCO BALL SPINS FASTER!", "SOMETHING FUNKY THIS WAY COMES!", "THE BEAT DROPS. SO DOES THE TEMPERATURE."])
@@ -2639,6 +2642,7 @@ function hurtEnemy(e, dmg){
   if (e.defId === "rolly") checkRollyPhase(e);
   if (e.defId === "gator") checkGatorPhase(e);
   if (e.defId === "doughmer") checkDoughmerPhase(e);
+  if (e.defId === "mcronald") checkMcronaldPhase(e);
 }
 function checkChipsPhase(e){
   if (!e.phase2 && e.alive && e.hp <= e.maxhp / 2){
@@ -3031,6 +3035,13 @@ function enemyBubble(){
       3: ["WHY YOU LITTLE...!!", "ROLLS!! ROOOOOLLS!!", "*INCOHERENT HUNGRY NOISES*"]
     }[B.bossPhase];
     B.bubble = { text: lines[B.turn % lines.length], e };
+  } else if (e.defId === "mcronald"){
+    const lines = {
+      1: ["WELCOME TO WACDONALDS. WHAT MAKES YOU HAPPY?", "RAN RAN RUU! ...NO? NOBODY? OKAY.", "SMILE. IT'S POLICY."],
+      2: ["RAN RAN RUU!! RAN RAN RUU!!", "THE HAPPY IS MANDATORY. THE MEAL IS OPTIONAL.", "I'VE SERVED BILLIONS. NONE OF THEM STAYED."],
+      3: ["RAN... RAN... RUU...", "CHANT WITH ME. PLEASE. IT ONLY WORKS IN A GROUP.", "A MASCOT WITHOUT A CROWD IS JUST A CLOWN IN THE RAIN."]
+    }[B.bossPhase];
+    B.bubble = { text: lines[B.turn % lines.length], e };
   } else if (e.defId === "gator"){
     const lines = {
       1: ["ROLLS. GIVE. NOW.", "I CAN SMELL THE MARINARA FROM HERE.", "*ENORMOUS JAW SOUNDS*"],
@@ -3058,7 +3069,7 @@ function startBullets(){
   B.bullets = [];
   B.soul.x = B.box.x + B.box.w / 2; B.soul.y = B.box.y + B.box.h / 2; B.soul.inv = 0;
   B.phaseT = 0;
-  B.phaseLen = ["boss", "ballpitFight", "rollyFight", "gatorFight", "doughmerFight"].includes(B.groupId) ? 430 + B.bossPhase * 30 : B.groupId === "secret" ? 430 : 380;
+  B.phaseLen = ["boss", "ballpitFight", "rollyFight", "gatorFight", "doughmerFight", "mcronaldFight"].includes(B.groupId) ? 430 + B.bossPhase * 30 : B.groupId === "secret" ? 430 : 380;
   B.curSlow = B.slowNext; B.slowNext = 1;
   B.tutHintT = B.tutorial ? 240 : 0;
   setState("bullets");
@@ -3145,7 +3156,7 @@ function applyPartyDamage(dmg){
 function runPattern(e){
   const t = B.phaseT, box = B.box;
   const pat = e.pattern === "boss" ? null : e.pattern;
-  const BOSS_GROUPS = ["boss", "ballpitFight", "rollyFight", "gatorFight", "doughmerFight"];
+  const BOSS_GROUPS = ["boss", "ballpitFight", "rollyFight", "gatorFight", "doughmerFight", "mcronaldFight"];
   const spdMul = (e.soft ? 0.75 : 1) * (BOSS_GROUPS.includes(B.groupId) ? 1 + (B.bossPhase - 1) * 0.18 : 1);
   if (e.pattern === "boss"){ bossPattern(e, t, spdMul); return; }
   if (e.pattern === "ballpit"){ ballpitPattern(e, t, spdMul); return; }
@@ -3264,6 +3275,7 @@ function finishBattle(won){
   if (won && gid === "rollyFight"){ G.flags.rollyDone = true; G.flags.rollySpared = allSpared; }
   if (won && gid === "gatorFight"){ G.flags.gatorDone = true; G.flags.gatorSpared = allSpared; }
   if (won && gid === "doughmerFight"){ G.flags.doughmerDone = true; G.flags.doughmerSpared = allSpared; }
+  if (won && gid === "mcronaldFight"){ G.flags.mcronaldDone = true; G.flags.mcronaldSpared = allSpared; }
   if (won && gid === "kongyFight") G.flags.kongySpared = allSpared;
   if (won && gid === "secret") G.flags.secretSpared = allSpared;
   if (won && gid === "comics") G.flags.comicsSpared = allSpared;
@@ -3278,7 +3290,8 @@ function finishBattle(won){
     comics:       { script: () => postComicsScript(),  done: () => G.flags.boardroomOpen },
     rollyFight:   { script: () => postRollyScript(),   done: () => G.flags.ch3Done },
     gatorFight:   { script: () => postGatorScript(),   done: () => G.flags.ch4Done },
-    doughmerFight:{ script: () => postDoughmerScript(),done: () => G.flags.ch5Done }
+    doughmerFight:{ script: () => postDoughmerScript(),done: () => G.flags.ch5Done },
+    mcronaldFight:{ script: () => postMcronaldScript(),done: () => G.flags.wacRelit }
   };
   const pm = postMap[gid];
   if (won && pm){
@@ -3338,12 +3351,12 @@ function drawBattle(){
     }
   }
 
-  // TP bar
-  drawText("TP", 78, 60, "#f0a030");
-  ctx.fillStyle = "#3a3f52"; ctx.fillRect(80, 70, 8, 96);
+  // TP bar (far left so it never overlaps enemies or the party panels)
+  drawText("TP", 58, 52, "#f0a030");
+  drawText(Math.round(G.tp) + "%", 46, 61, "#f0a030");
+  ctx.fillStyle = "#3a3f52"; ctx.fillRect(60, 70, 8, 96);
   const tph = Math.round(96 * G.tp / 100);
-  ctx.fillStyle = "#f0a030"; ctx.fillRect(80, 166 - tph, 8, tph);
-  drawText(Math.round(G.tp) + "%", 70, 170, "#f0a030");
+  ctx.fillStyle = "#f0a030"; ctx.fillRect(60, 166 - tph, 8, tph);
 
   // box / message area
   const bx = B.box;
@@ -6295,16 +6308,667 @@ function postDoughmerScript(){
 function logoutScript(){
   return [
     { t:"THE LOG OUT DOOR GLOWS GREEN. BEYOND IT: STAIRS. REAL STAIRS. STREET-SHAPED LIGHT." },
-    { t:"LOG OUT AND GO HOME? FINAL ANSWER?", choices:[
+    { t:"LOG OUT AND HEAD UP?", choices:[
       { t:"LOG OUT", fn(){
           say([
-            { p:"dorko", name:"DORKO", t:"FIVE DARK WORLDS. ONE FAMILY OF ROLLS. AND ONE NEW ROOMMATE. WE'RE DONE. FOR REAL. FOREVER. PROBABLY." },
-            { p:"mega", name:"MEGAFIRE", t:"IF ANYTHING ELSE GOES DARK IN OUR PRESENCE, I'M SIMPLY LYING DOWN WHEREVER I AM." },
-            { p:"bob", name:"BOB", t:"BEST FLUSH OF MY LIFE. ZERO STARS. WOULD BE FLUSHED AGAIN." },
-            { p:"bmo", name:"BMO", t:"ROLL CREDITS. FINAL PUN. I'M RETIRING IT. IT HAD A GOOD RUN. LIKE US." },
-            { t:"YOU CLIMB THE STAIRS INTO REAL SUNLIGHT, FOUR HEROES AND A BAG OF ROLLS THAT SAW FIVE WORLDS." }
+            { t:"YOU CLIMB THE STAIRS, PAST A BEADED CURTAIN, A SLEEPING CASHIER, AND A PYRAMID OF EMPTY ENERGY CANS." },
+            { t:"IT'S AN INTERNET CAFE. THE SERVER FARM WAS UNDER AN INTERNET CAFE. OF COURSE IT WAS." },
+            { p:"bob", name:"BOB", t:"THE WORLD IS SMALL AND FULL OF BASEMENTS." },
+            { p:"mega", name:"MEGAFIRE", t:"DAYLIGHT. ACTUAL DAYLIGHT. IF ANYTHING OUT HERE TURNS INTO A DARK WORLD, I'M MOVING." },
+            { p:"bmo", name:"BMO", t:"...GUYS. LOOK ACROSS THE STREET. IS THAT A WACDONALDS?" },
+            { p:"dorko", name:"DORKO", t:"DON'T LOOK AT IT. DON'T SMELL IT. WE FIND THE MOBILE AND WE GO HOME." }
           ], () => {
             G.flags.ch5Done = 1;
+            G.flags.ch6 = 1;
+            enterRoom("street", 106, 120, true);
+            saveGame();
+          });
+        } },
+      { t:"NOT YET", fn(){ say([{ p:"bob", name:"BOB", t:"SURE! ONE MORE LAP! I LOVE LAPS! I'VE NEVER HAD FRIENDS TO LAP WITH!" }]); } }
+    ] }
+  ];
+}
+// ================= CHAPTER 6: WACDONALDS (FAST FOOD WORLD) =================
+
+// ---- sprites ----
+const mcronaldPal = { r:"#d83028", R:"#a82018", w:"#f2f2ee", y:"#f5c542", k:"#14141c", n:"#e05858", b:"#3858c0" };
+const mcronaldSpr = S([
+"..rrr......rrr....",
+".rrrrr....rrrrr...",
+".rrrrrwwwwrrrrr...",
+".rrrwwwwwwwwrrr...",
+"..rwwwwwwwwwwr....",
+"..wwkkwwwwkkww....",
+"..wwkkwwwwkkww....",
+"..wwwwwnnwwwww....",
+"..wwwwnnnnwwww....",
+"..wRwwwnnwwwRw....",
+"..wwRRwwwwRRww....",
+"..wwwRRRRRRwww....",
+"...wwwwwwwwww.....",
+"...yyyyyyyyyy.....",
+"..yyyyyyyyyyyy....",
+".yyrryyyyyyrryy...",
+".yyrryyyyyyrryy...",
+"..yyyyyyyyyyyy....",
+"...yyyy..yyyy.....",
+"...yyyy..yyyy.....",
+"..rrrr....rrrr....",
+".rrrrr....rrrrr...",
+], mcronaldPal);
+const mcronaldPort = S([
+"..rrrr........rrrr......",
+".rrrrrr......rrrrrr.....",
+".rrrrrwwwwwwwwrrrrr.....",
+".rrrwwwwwwwwwwwwrrr.....",
+"..rwwwwwwwwwwwwwwr......",
+"..wwwkkwwwwwwkkwww......",
+"..wwwkkwwwwwwkkwww......",
+"..wwwwwwwnnwwwwwww......",
+"..wwwwwwnnnnwwwwww......",
+"..wwwwwwwnnwwwwwww......",
+"..wRRwwwwwwwwwwRRw......",
+"..wwRRRwwwwwwRRRww......",
+"..wwwRRRRRRRRRRwww......",
+"...wwwwRRRRRRwwww.......",
+"....wwwwwwwwwwww........",
+"......yyyyyyyy..........",
+"........................",
+], mcronaldPal);
+PORTRAITS.mcronald = mcronaldPort;
+VOICES.mcronald = 210;
+const burgSpr = S([
+"...nnnnnnnn...",
+"..nnnnnnnnnn..",
+".nnyynnnnyynn.",
+".nnyknnnnyknn.",
+".nnnnnnnnnnnn.",
+".ggggggggggggg",
+"rrrrrrrrrrrrr.",
+".ccccccccccc..",
+".mmmmmmmmmmm..",
+"..nnnnnnnnn...",
+"...nn...nn....",
+"...kk...kk....",
+], { n:"#e8a24a", y:"#f2f2ee", k:"#14141c", g:"#6ab04a", r:"#c04838", c:"#f5c542", m:"#b06a3c" });
+const mealSpr = S([
+"....rr..rr....",
+"....rrrrrr....",
+"..rrrrrrrrrr..",
+".rrrrrrrrrrrr.",
+".rryyrrrryyrr.",
+".rrykrrrrykrr.",
+".rrrrrrrrrrrr.",
+".rrryrrrryrrr.",
+".rrrryyyyrrrr.",
+".rrrrrrrrrrrr.",
+".rrrrrrrrrrrr.",
+"..rr......rr..",
+"..kk......kk..",
+], { r:"#d83028", y:"#f5c542", k:"#14141c" });
+const frySpr = S([
+".y.yy.y.yy.y..",
+".yyyyyyyyyyy..",
+".y.yy.yy.yy...",
+"..rrrrrrrrr...",
+".rrrrrrrrrrr..",
+".rrwwrrrwwrr..",
+".rrwkrrrwkrr..",
+".rrrrrrrrrrr..",
+".rrrkkkkrrrr..",
+".rrrrrrrrrrr..",
+"..rr.....rr...",
+"..kk.....kk...",
+], { y:"#ffe14a", r:"#d83028", w:"#f2f2ee", k:"#14141c" });
+const paperoSpr = S([
+".wwwwwwwww..",
+".wwwwwwwww..",
+".wwkwwwkww..",
+".wwwwwwwww..",
+".wwwkkwwww..",
+".wwwwwwwww..",
+".wwwwwwwww..",
+], { w:"#e8e8e0", k:"#14141c" }, null);
+const collectorSpr = S([
+"...hhhhhh.....",
+"..hhhhhhhh....",
+"..sssssssss...",
+"..swwsssws....",
+"..swksssks....",
+"..sssssssss...",
+"..ssskkksss...",
+"..ttttttttt...",
+".tttttttttt...",
+".ttgggggttt...",
+".ttttttttt....",
+"...tt..tt.....",
+"...kk..kk.....",
+], { h:"#3a2c1c", s:"#e8b078", w:"#ffffff", k:"#14141c", t:"#4a4a5c", g:"#c9c9d8" });
+
+// ---- ch6 music: jolly circus with something wrong underneath ----
+Object.assign(SONGS, {
+  wac: {
+    bpm: 116, tracks: [
+      { wave: "square", vol: 0.10, seq:
+        "A4 C5 E5 C5 A4 C5 E5 C5 G4 B4 D5 B4 G4 B4 D5 B4 A4 C5 E5 A5 G5 E5 C5 E5 F5 E5 D5 C5 B4 G4 E4 ." },
+      { wave: "sawtooth", vol: 0.045, seq:
+        ".  .  A3 .  .  .  A3 .  .  .  G3 .  .  .  G3 .  .  .  A3 .  .  .  C4 .  .  .  D4 .  .  .  E4 ." },
+      { wave: "triangle", vol: 0.25, seq:
+        "A2 E3 A2 E3 A2 E3 A2 E3 G2 D3 G2 D3 G2 D3 G2 D3 A2 E3 A2 E3 A2 E3 A2 E3 D2 A2 E2 B2 A2 E3 A2 E3" },
+    ],
+    noise: "k . h . s . h . k . h . s . h . k . h . s . h . k . h . s h s ."
+  }
+});
+
+// ---- ch6 items + the counter ----
+Object.assign(ITEMS, {
+  wacburger: { name:"WACBURGER", heal:40, desc:"2 PERCENT BEEF, 98 PERCENT COMMITMENT. 40 HP." },
+  frites:    { name:"FRITES",    heal:15, tp:30, desc:"CRISPY AND FIERCELY LOYAL. 15 HP, 30 PERCENT TP." },
+  cone:      { name:"SOFT CONE", heal:60, tp:20, desc:"FROM A MACHINE THAT WAS NEVER BROKEN. 60 HP, 20 PERCENT TP." }
+});
+const WAC_STOCK = [ ["wacburger", 30], ["frites", 20] ];
+function wacShop(){
+  const choices = WAC_STOCK.map(([id, price]) => ({
+    t: `${ITEMS[id].name} ${price}`,
+    fn(){
+      if (G.crumbs < price){
+        say([{ t:"GLORP: THE REGISTER SAYS NO. THE REGISTER HAS NEVER SAID NO BEFORE. WE'RE BOTH LEARNING TODAY.", fn: wacShop }]);
+        return;
+      }
+      if (G.inv.length >= 8){ say([{ t:"GLORP: YOUR POCKETS ARE FULL. THAT'S NOT A METAPHOR. NO SALE.", fn: wacShop }]); return; }
+      G.crumbs -= price; G.inv.push(id);
+      SFX.save();
+      say([{ t:"GLORP SLIDES IT ACROSS THE COUNTER WITHOUT BREAKING EYE CONTACT. 'ENJOY. OR DON'T. FREE COUNTRY.'", fn: wacShop }]);
+    }
+  }));
+  choices.push({ t:"LEAVE", fn(){ say([{ t:"GLORP: HAVE A DAY. I'M LEGALLY NOT ALLOWED TO SPECIFY WHICH KIND." }]); } });
+  say([{ t:`GLORP THE NIGHT-FRYER LEANS ON THE DEAD REGISTER. "MENU'S WHATEVER I CAN REACH. CRUMBS ONLY. (${G.crumbs})"`, choices }]);
+}
+
+// ---- ch6 enemies ----
+Object.assign(ENEMY_DEFS, {
+  burg: {
+    name:"BIG WAC", spr:burgSpr, hp:110, atk:10, def:3, exp:52, crumbs:46, pattern:"lob",
+    check:"BIG WAC - ATK 10 DEF 3. A FLAGSHIP SANDWICH WITH SOMETHING TO PROVE. CONTAINS 2 PERCENT BEEF AND 98 PERCENT SECRETS.",
+    quotes:["WOULD YOU LIKE ME WITH THAT?","I AM THE FLAGSHIP. SALUTE THE FLAGSHIP.","*SESAME SEEDS RATTLE MENACINGLY*","MY SAUCE IS SPECIAL. NOBODY ASKS WHY."],
+    acts:[
+      { t:"COMPLIMENT BUN", fn(e){ e.bunned = true; return "YOU PRAISE THE BUN'S STRUCTURAL INTEGRITY. THE BIG WAC GLISTENS. NOBODY EVER NOTICES THE BUN."; } },
+      { t:"HOLD PICKLES", fn(e){
+          if (e.bunned){ e.spareable = true; return "YOU PROMISE A WORLD WITH NO SURPRISE PICKLES. THE BIG WAC RELAXES LAYER BY LAYER. IT'S FINALLY BEING TAKEN AS ORDERED."; }
+          return "IT SUSPECTS YOU'RE JUST SAYING THAT. COMPLIMENT THE BUN FIRST. THE BUN IS THE WAY IN."; } }
+    ],
+    killText:"THE BIG WAC COMES APART INTO ITS COMPONENT LAYERS. IT IS SURVIVED BY THE SAUCE.",
+    spareText:"THE BIG WAC REASSEMBLES ITSELF NEATLY AND ROLLS AWAY, HELD TOGETHER BY RESPECT ALONE."
+  },
+  gladmeal: {
+    name:"GLAD MEAL", spr:mealSpr, hp:90, atk:10, def:2, exp:48, crumbs:42, pattern:"capsules",
+    check:"GLAD MEAL - ATK 10 DEF 2. A SMILING BOX. THE SMILE IS PRINTED ON. THE TOY INSIDE IS SADNESS.",
+    quotes:["I'M HAPPY! IT SAYS SO ON THE BOX!",":) :) :) :) :)","COLLECT ALL SIX! NOBODY EVER COLLECTS ALL SIX.","THE HANDLE IS FOR CARRYING ME AWAY FROM HERE."],
+    acts:[
+      { t:"ASK IF OK", fn(e){ e.opened = true; return "YOU ASK THE GLAD MEAL IF IT'S ACTUALLY OKAY. THE PRINTED SMILE STAYS. THE CARDBOARD SAGS A LITTLE. NOBODY'S EVER ASKED."; } },
+      { t:"VALIDATE", fn(e){
+          if (e.opened){ e.spareable = true; return "YOU TELL IT THE TOY INSIDE DOESN'T DEFINE ITS WORTH. THE BOX UNFOLDS COMPLETELY FLAT. AT PEACE. RECYCLABLE."; }
+          return "IT DEFLECTS WITH A FUN FACT ABOUT ITS COLLECTIBLE LID. ASK IF IT'S OK FIRST."; } }
+    ],
+    killText:"THE GLAD MEAL FOLDS ALONG ITS PERFORATED LINES, SMILING TO THE END. THE TOY WAS A TINY MIRROR.",
+    spareText:"THE GLAD MEAL SKIPS AWAY SWINGING ITS OWN HANDLE. GENUINELY GLAD, FOR ONCE."
+  },
+  fryens: {
+    name:"FRYENS", spr:frySpr, hp:100, atk:11, def:1, exp:50, crumbs:44, pattern:"fries",
+    check:"FRYENS - ATK 11 DEF 1. A CARTON OF FRIES ACTING AS ONE. THEY REMEMBER BEING A POTATO. THEY REMEMBER BEING WHOLE.",
+    quotes:["NOBODY EVER ASKS. THEY JUST TAKE.","WE ARE MANY. WE ARE CRISPY. WE ARE ONE.","*A FINE MIST OF SALT*","THE KETCHUP KNOWS WHAT IT DID."],
+    acts:[
+      { t:"ASK FOR ONE", fn(e){ e.asked = true; return "YOU ASK - POLITELY, VERBALLY - FOR A SINGLE FRY. THE CARTON GASPS. CONSENT? IN THIS ECONOMY?"; } },
+      { t:"DECLARE POTATO", fn(e){
+          if (e.asked){ e.spareable = true; return "YOU REMIND THEM: BEFORE THE FRYER, THEY WERE ONE POTATO. WHOLE. REAL. THE FRIES HUDDLE TOGETHER, MOVED BEYOND SALT."; }
+          return "THEY CAN'T HEAR HISTORY OVER THE TRAUMA OF BEING GRABBED. ASK FOR ONE FIRST."; } }
+    ],
+    killText:"THE FRYENS SCATTER ACROSS THE FLOOR. FIVE-SECOND RULE. NOBODY INVOKES IT.",
+    spareText:"THE FRYENS MARCH AWAY IN POTATO FORMATION, CLOSER TO WHOLE THAN THEY'VE BEEN IN YEARS."
+  },
+  mcronald: {
+    name:"DONALD MCRONALD", spr:mcronaldSpr, hp:750, atk:12, def:4, exp:520, crumbs:420, pattern:"ranran",
+    check:"DONALD MCRONALD - ATK 12 DEF 4. THE ETERNAL MASCOT. THE SMILE IS LOAD-BEARING. HE JUST WANTS SOMEONE TO CHANT BACK.",
+    quotes:[],
+    acts:[
+      { t:"ASK ABOUT MACHINE", fn(e){
+          e.machine = true;
+          return "YOU ASK ABOUT THE ICE CREAM MACHINE. ONE PAINTED TEAR ROLLS DOWN HIS CHEEK. 'IT WAS NEVER BROKEN. IT WAS RESTING. LIKE ME.'"; } },
+      { t:"RAN RAN RUU", fn(e){
+          if (e.machine){
+            e.spareable = true;
+            [523, 523, 784, 523, 523, 880].forEach((f, i) => tone(f, 0.12, "square", 0.16, 0, i * 0.13));
+            return "YOU RAISE YOUR ARMS AND CHANT: RAN RAN RUU! HE GASPS. HE POSES. FOR THE FIRST TIME IN DECADES, SOMEBODY CHANTED BACK.";
+          }
+          return "HE WANTS TO CHANT. HIS HEART ISN'T IN IT. SOMETHING WEIGHS ON HIM. SOMETHING COLD, AND SOFT-SERVE SHAPED."; } }
+    ],
+    killText:"DONALD MCRONALD FOLDS LIKE A PAPER CROWN. THE SMILE STAYS. SMILES LIKE THAT ALWAYS STAY.",
+    spareText:"DONALD MCRONALD STRIKES ONE FINAL POSE. RAN RAN RUU ECHOES THROUGH THE PLAYPLACE LIKE A BLESSING."
+  }
+});
+Object.assign(GROUPS, {
+  wac1: ["burg"], wac2: ["fryens", "gladmeal"],
+  mcronaldFight: ["mcronald"]
+});
+function checkMcronaldPhase(e){
+  const frac = e.hp / e.maxhp;
+  if (B.bossPhase === 1 && frac <= 0.66 && e.alive){
+    B.bossPhase = 2;
+    [659, 659, 988].forEach((f, i) => tone(f, 0.1, "square", 0.14, 0, i * 0.11));
+    B.bossDlgQueue.push([
+      { t:"DONALD MCRONALD PLANTS BOTH FEET AND STRIKES THE POSE. THE POSE. 'RAN RAN RUU!!'" },
+      { p:"bob", name:"BOB", t:"WHY IS IT CATCHY. SOMEONE TELL ME WHY IT'S CATCHY." },
+      { p:"dorko", name:"DORKO", t:"NOBODY CHANT. IT'S HOW HE RECRUITS." }
+    ]);
+  }
+  if (B.bossPhase === 2 && frac <= 0.33 && e.alive){
+    B.bossPhase = 3;
+    B.bossDlgQueue.push([
+      { t:"THE CHANT FALTERS. MCRONALD'S EYES SEARCH THE EMPTY RESTAURANT FOR A CROWD THAT ISN'T THERE." },
+      { p:"mega", name:"MEGAFIRE", t:"SIX FOR SIX. HUNGRY AND SAD. EVERY SINGLE TIME. WHY IS EVERY BOSS JUST US, EMOTIONALLY?" },
+      { p:"bmo", name:"BMO", t:"A MASCOT WITH NO CROWD IS JUST A GUY DOING A BIT ALONE. GUYS, I KNOW HOW TO BEAT HIM. WE DO THE BIT WITH HIM." }
+    ]);
+  }
+}
+Object.assign(EXTRA_PATTERNS, {
+  fries(e, t, spdMul, box){
+    if (t % 46 === 10){
+      const gap = (Math.sin(t * 0.02 + e.seed) * 0.5 + 0.5) * (box.w - 48) + box.x + 24;
+      for (let x = box.x + 8; x < box.x + box.w - 4; x += 18)
+        if (Math.abs(x - gap) >= 16)
+          spawnBullet({ x, y: box.y + 4, vx: 0, vy: 1.5 * spdMul, r: 4, dmg: e.atk, col:"#ffe14a", kind:"chip" });
+    }
+    if (t % 90 === 45) aimShot(e, box, 2.0 * spdMul, "#f2f2ee", "ball", 3);
+  },
+  ranran(e, t, spdMul, box){
+    const ph = B.bossPhase;
+    if (t % (ph === 1 ? 100 : 130) === 20)
+      spawnBullet({ x: box.x + 16, y: box.y + 10, vx: 1.5 * spdMul, vy: 1.3 * spdMul, r: 6, dmg: e.atk + 1, col:"#e8a24a", kind:"bounce", life: 280 });
+    if (t % 52 === 8){
+      const gap = (Math.sin(t * 0.017 + e.seed) * 0.5 + 0.5) * (box.w - 48) + box.x + 24;
+      for (let x = box.x + 8; x < box.x + box.w - 4; x += 20)
+        if (Math.abs(x - gap) >= 17)
+          spawnBullet({ x, y: box.y + 4, vx: 0, vy: 1.35 * spdMul, r: 4, dmg: e.atk, col:"#ffe14a", kind:"chip" });
+    }
+    if (ph >= 2 && t % 12 === 0){
+      const a = t * 0.16 + e.seed;
+      spawnBullet({ x: box.x + box.w / 2, y: box.y + box.h / 2 - 10,
+        vx: Math.cos(a) * 1.3 * spdMul, vy: Math.sin(a) * 1.3 * spdMul, r: 3, dmg: e.atk, col:"#e05858", kind:"ring" });
+    }
+    if (ph >= 2 && t % 64 === 32) aimShot(e, box, 2.2 * spdMul, "#f2f2ee", "ball", 4);
+    if (ph >= 3 && t % 130 === 65)
+      spawnBullet({ x: box.x + box.w - 12, y: box.y + 8, vx: -0.5, vy: 0.5, r: 5, dmg: e.atk + 2, col:"#d83028", kind:"homing", life: 240 });
+  }
+});
+
+// ---- ch6 rooms ----
+Object.assign(ROOMS, {
+  street: {
+    w: 560, h: 240, music: "town", dark: false,
+    floor: "#4a4a52",
+    walls: [
+      { x:0, y:0, w:96, h:70 }, { x:116, y:0, w:140, h:70 },
+      { x:276, y:0, w:140, h:70 }, { x:436, y:0, w:124, h:70 },
+      { x:0, y:226, w:560, h:14 },
+      { x:0, y:0, w:10, h:240 }, { x:550, y:0, w:10, h:240 },
+      { x:452, y:170, w:76, h:34 }  // the pizza-mobile
+    ],
+    deco(){
+      // sidewalk + road
+      ctx.fillStyle = "#5c5c66"; ctx.fillRect(0, 70, 560, 40);
+      ctx.fillStyle = "#6a6a74";
+      for (let x = 0; x < 560; x += 40) ctx.fillRect(x, 106, 30, 3);
+      ctx.fillStyle = "#3a3a42"; ctx.fillRect(0, 112, 560, 128);
+      ctx.fillStyle = "#f5c542";
+      for (let x = 10; x < 560; x += 52) ctx.fillRect(x, 172, 26, 4);
+      // storefront band
+      wallFace(0, 0, 560, 70, "#2e2a36", "#48414f");
+      // net cafe front
+      ctx.fillStyle = "#20303e"; ctx.fillRect(60, 12, 96, 46);
+      ctx.fillStyle = "#40e0d0"; ctx.fillRect(66, 18, 38, 22);
+      ctx.fillStyle = "#14202c"; ctx.fillRect(70, 22, 30, 14);
+      drawTextC("NET CAFE", 108, 4, "#40e0d0");
+      ctx.fillStyle = "#3c2a1c"; ctx.fillRect(96, 30, 20, 40);
+      ctx.fillStyle = "#c9f07a"; ctx.fillRect(102, 48, 8, 5);
+      // wacdonalds front
+      ctx.fillStyle = "#7a2020"; ctx.fillRect(224, 12, 112, 46);
+      ctx.fillStyle = "#f5c542";
+      ctx.fillRect(246, 18, 6, 18); ctx.fillRect(258, 18, 6, 18);
+      ctx.fillRect(250, 22, 10, 5);
+      drawTextC("WACDONALDS", 280, 4, "#f5c542");
+      ctx.fillStyle = "#3c2a1c"; ctx.fillRect(256, 30, 20, 40);
+      ctx.fillStyle = "#ffd0a0"; ctx.fillRect(262, 48, 8, 5);
+      // game store front
+      ctx.fillStyle = "#2e2040"; ctx.fillRect(392, 12, 100, 46);
+      ctx.fillStyle = "#e040c0"; ctx.fillRect(398, 18, 34, 24);
+      ctx.fillStyle = "#1a1228"; ctx.fillRect(402, 22, 26, 16);
+      drawTextC("GAME HOLE", 442, 4, "#e040c0");
+      ctx.fillStyle = "#3c2a1c"; ctx.fillRect(416, 30, 20, 40);
+      ctx.fillStyle = "#e0a0f0"; ctx.fillRect(422, 48, 8, 5);
+      // the pizza-mobile, parked and faithful
+      ctx.fillStyle = "#c03028"; ctx.fillRect(452, 166, 76, 30);
+      ctx.fillStyle = "#e8b040"; ctx.fillRect(458, 158, 46, 14);
+      ctx.fillStyle = "#7ec8e8"; ctx.fillRect(462, 161, 16, 8); ctx.fillRect(484, 161, 16, 8);
+      ctx.fillStyle = "#f0d060"; ctx.beginPath(); ctx.arc(490, 181, 9, 0, 7); ctx.fill();
+      ctx.fillStyle = "#c03028"; ctx.beginPath(); ctx.arc(487, 179, 2.4, 0, 7); ctx.arc(494, 183, 2.4, 0, 7); ctx.fill();
+      ctx.fillStyle = "#1c1c24"; ctx.fillRect(458, 194, 14, 8); ctx.fillRect(506, 194, 14, 8);
+      drawTextC("PIZZA-MOBILE", 490, 148, "#e8b040");
+    },
+    npcs: [
+      { id:"mobile6", x:490, y:208, spr:null, w:60, h:12, sign:true, noDraw:true,
+        dlg(){ return finalDriveScript(); } },
+      { id:"hydrant", x:190, y:96, spr:null, w:10, h:10, sign:true, noDraw:true,
+        dlg(){ return [{ t:"A FIRE HYDRANT. IT HAS SEEN THINGS. MOSTLY DOGS." }]; } }
+    ],
+    saves: [ { x:180, y:150 } ],
+    exits: [
+      { x:96, y:56, w:20, h:12, to:"icafe", tx:110, ty:140, dir:"up" },
+      { x:256, y:56, w:20, h:12, to:"wacdonalds", tx:278, ty:264, dir:"up" },
+      { x:416, y:56, w:20, h:12, to:"gamestore", tx:110, ty:140, dir:"up" }
+    ],
+    spawns: []
+  },
+  icafe: {
+    w: 220, h: 170, music: "home", dark: false,
+    floor: "#2a3240",
+    walls: [
+      { x:0, y:0, w:220, h:44 }, { x:0, y:0, w:10, h:170 }, { x:210, y:0, w:10, h:170 },
+      { x:0, y:160, w:90, h:10 }, { x:130, y:160, w:90, h:10 },
+      { x:30, y:70, w:70, h:20 }, { x:130, y:100, w:60, h:20 }
+    ],
+    deco(){
+      checkerFloor(220, 170, "#323a4a", 18, 44);
+      wallFace(0, 0, 220, 44, "#1a2230", "#28303e");
+      drawTextC("NET CAFE", 110, 8, "#40e0d0");
+      // pc desks
+      [[30,70,70],[130,100,60]].forEach(([dx,dy,dw]) => {
+        ctx.fillStyle = "#3c3428"; ctx.fillRect(dx, dy, dw, 20);
+        for (let px2 = dx + 6; px2 < dx + dw - 12; px2 += 24){
+          ctx.fillStyle = "#14141c"; ctx.fillRect(px2, dy - 8, 16, 14);
+          ctx.fillStyle = "#40e0d0"; ctx.fillRect(px2 + 2, dy - 6, 12, 9);
+        }
+      });
+      // the basement door they came out of
+      ctx.fillStyle = "#3c2a1c"; ctx.fillRect(180, 24, 20, 22);
+      ctx.fillStyle = "#e05858"; ctx.fillRect(186, 34, 8, 5);
+      // energy can pyramid
+      ctx.fillStyle = "#58c858";
+      for (let r = 0; r < 3; r++) for (let c = 0; c <= r; c++) ctx.fillRect(24 + c * 7 - r * 3, 128 + r * 8, 5, 7);
+    },
+    npcs: [
+      { id:"cafeguy1", x:60, y:104, spr:congoerSpr, w:12, h:12, solid:true, name:"WIRED",
+        dlg(n){
+          return n % 2 ? [{ t:"WIRED: I'VE BEEN ONLINE FOR 61 HOURS. THE FORUM NEEDS ME. THE FORUM DOESN'T KNOW I EXIST." }]
+                       : [{ t:"WIRED: DID THE POWER FLICKER LAST NIGHT? MY RAID WIPED AND I HEARD... CHANTING?" }];
+        } },
+      { id:"cafenap", x:160, y:134, spr:congoerSpr, w:12, h:12, solid:true, name:"CASHIER",
+        dlg(){ return [
+          { t:"THE CASHIER IS ASLEEP UPRIGHT, KEYS IN HAND. A NOTE ON THE TILL: 'BACK IN 5. TIME IS A FLAT CIRCLE.'" },
+          { p:"bob", name:"BOB", t:"WE WALKED PAST HIM TWICE COMING OUT OF THE BASEMENT. HE NEVER STIRRED. LEGEND." }
+        ]; } },
+      { id:"basementdoor", x:190, y:52, spr:null, w:20, h:10, sign:true, noDraw:true,
+        dlg(){ return [
+          { t:"THE BASEMENT DOOR. BEHIND IT: STAIRS DOWN TO THE SERVER FARM, AND FIVE WORLDS OF MEMORIES." },
+          { p:"mega", name:"MEGAFIRE", t:"NEVER AGAIN. NAIL IT SHUT. POUR THE CONCRETE. I'LL WAIT." }
+        ]; } },
+      { id:"chest_cafe", x:30, y:120, chest:true, item:"energy", flag:"chest_cafe", w:12, h:10,
+        dlg(){ return chestDlg("energy", "chest_cafe"); } }
+    ],
+    saves: [],
+    exits: [ { x:92, y:164, w:36, h:6, to:"street", tx:106, ty:83, dir:"down" } ],
+    spawns: []
+  },
+  gamestore: {
+    w: 220, h: 170, music: "shelf", dark: false,
+    floor: "#2e2436",
+    walls: [
+      { x:0, y:0, w:220, h:44 }, { x:0, y:0, w:10, h:170 }, { x:210, y:0, w:10, h:170 },
+      { x:0, y:160, w:90, h:10 }, { x:130, y:160, w:90, h:10 },
+      { x:30, y:70, w:50, h:18 }, { x:140, y:70, w:50, h:18 }
+    ],
+    deco(){
+      checkerFloor(220, 170, "#382c42", 18, 44);
+      wallFace(0, 0, 220, 44, "#1e1630", "#2c2240");
+      drawTextC("THE GAME HOLE", 110, 8, "#e040c0");
+      // shelves of boxed games
+      [[30,70],[140,70]].forEach(([sx, sy]) => {
+        ctx.fillStyle = "#4a3c2c"; ctx.fillRect(sx, sy, 50, 18);
+        const cols = ["#e05858","#58a0e0","#58c858","#e8a030","#e040c0","#40e0d0"];
+        for (let i = 0; i < 6; i++){ ctx.fillStyle = cols[i]; ctx.fillRect(sx + 4 + i * 7, sy + 3, 5, 12); }
+      });
+      // news tv on the wall
+      ctx.fillStyle = "#14141c"; ctx.fillRect(88, 14, 44, 26);
+      ctx.fillStyle = "#3a5878"; ctx.fillRect(91, 17, 38, 20);
+      ctx.fillStyle = "#e05858"; ctx.fillRect(91, 30, 38, 7);
+      drawTextC("NEWS", 110, 22, "#f2f2ee");
+      // wet floor sign of grief
+      ctx.fillStyle = "#f5c542"; ctx.fillRect(104, 120, 4, 12); ctx.fillRect(96, 130, 20, 3);
+    },
+    npcs: [
+      { id:"collector", x:110, y:70, spr:collectorSpr, w:12, h:12, solid:true, name:"THE COLLECTOR",
+        dlg(n){
+          if (n === 0){
+            return [
+              { t:"THE TV TICKER READS: 'PUBLISHERS CONFIRM - NO MORE PHYSICAL GAME RELEASES. EVER. EFFECTIVE TUESDAY.'" },
+              { t:"THE COLLECTOR TAKES A BREATH THAT LASTS NINE SECONDS." },
+              { t:"THE COLLECTOR: I'M FINISHED.", sfx(){ shake(5, 18); noiseHit(0.25, 0.22, 2.2); } },
+              { t:"THE COLLECTOR: I'M FINISHEEEEEEED!!", sfx(){ shake(8, 30); noiseHit(0.5, 0.3, 1.6); tone(880, 0.5, "sawtooth", 0.12, 220); } },
+              { t:"THE COLLECTOR: NO MORE BOXES. NO MORE MANUALS. NO MORE THAT SMELL. YOU KNOW THE SMELL. I'M FINISHED!!" },
+              { p:"bmo", name:"BMO", t:"A COLLECTION IS A PROMISE THAT THE PAST HAPPENED. LET HIM SCREAM. HE SCREAMS FOR ALL OF US." },
+              { p:"dorko", name:"DORKO", t:"WE'RE NOT ADOPTING HIM. WE ALREADY GOT A BOMB THIS MONTH." }
+            ];
+          }
+          return n % 2 ? [{ t:"THE COLLECTOR: I'M FINISHED.", sfx(){ shake(4, 14); } }]
+                       : [{ t:"THE COLLECTOR HOLDS A BOXED COPY OF SOMETHING TO HIS CHEST LIKE A PHOTOGRAPH OF THE WAR." }];
+        } },
+      { id:"clerk", x:52, y:112, spr:collectorSpr, w:12, h:12, solid:true, name:"CLERK",
+        dlg(n){
+          return n % 2 ? [{ t:"CLERK: HE'S BEEN LIKE THIS SINCE TUESDAY. HE DOESN'T EVEN WORK HERE." }]
+                       : [{ t:"CLERK: I'D CALL SOMEONE, BUT HONESTLY? HE'S RIGHT. LET HIM COOK." }];
+        } }
+    ],
+    saves: [],
+    exits: [ { x:92, y:164, w:36, h:6, to:"street", tx:426, ty:83, dir:"down" } ],
+    spawns: []
+  },
+  wacdonalds: {
+    w: 560, h: 300, music: "wac", dark: () => !G.flags.mcronaldDone,
+    floor: "#5c2020",
+    walls: [
+      { x:0, y:0, w:560, h:70 },
+      { x:0, y:286, w:258, h:14 }, { x:298, y:286, w:262, h:14 },
+      { x:0, y:0, w:14, h:300 },
+      { x:550, y:0, w:14, h:120 }, { x:550, y:176, w:14, h:124 },
+      { x:200, y:70, w:160, h:30 },  // the counter
+      { x:60, y:70, w:36, h:46 },    // the ice cream machine
+      { x:80, y:150, w:44, h:24 }, { x:400, y:200, w:44, h:24 }, { x:200, y:210, w:44, h:24 }  // tables
+    ],
+    tick(){
+      if (!G.flags.wacIntro && G.mode === "world" && !G.dialog && !G.menu && G.fade.a <= 0){
+        G.flags.wacIntro = 1;
+        say(wacArrivalScript());
+      }
+    },
+    deco(){
+      checkerFloor(560, 286, "#6a2828", 20, 70);
+      wallFace(0, 0, 560, 70, "#3a1414", "#521c1c");
+      // menu boards
+      for (let bx = 150; bx <= 390; bx += 120){
+        ctx.fillStyle = "#14141c"; ctx.fillRect(bx, 10, 100, 40);
+        ctx.fillStyle = "#f5c542"; ctx.fillRect(bx + 4, 14, 40, 5); ctx.fillRect(bx + 4, 24, 60, 5);
+        ctx.fillStyle = "#e05858"; ctx.fillRect(bx + 4, 34, 50, 5);
+      }
+      drawTextC("WACDONALDS - OVER 1 SERVED", 280, 2, "#f5c542");
+      // the counter
+      ctx.fillStyle = "#8a3030"; ctx.fillRect(200, 70, 160, 30);
+      ctx.fillStyle = "#a84040"; ctx.fillRect(200, 70, 160, 8);
+      ctx.fillStyle = "#f5c542";
+      ctx.fillRect(272, 76, 5, 14); ctx.fillRect(282, 76, 5, 14); ctx.fillRect(275, 79, 10, 4);
+      // the ice cream machine
+      ctx.fillStyle = "#b8b8c4"; ctx.fillRect(60, 70, 36, 46);
+      ctx.fillStyle = "#8a8a98"; ctx.fillRect(64, 76, 28, 16);
+      ctx.fillStyle = G.flags.mcronaldDone ? "#58c858" : "#e05858";
+      ctx.fillRect(74, 96, 8, 6);
+      ctx.fillStyle = "#f2f2ee"; ctx.fillRect(72, 104, 12, 8);
+      drawTextC(G.flags.mcronaldDone ? "OPEN" : "BROKEN", 78, 60, G.flags.mcronaldDone ? "#58c858" : "#e05858");
+      // dining tables (they match the collision rects)
+      [[80,150,44],[400,200,44],[200,210,44]].forEach(([tx2, ty2, tw]) => {
+        ctx.fillStyle = "#8a3030"; ctx.fillRect(tx2, ty2, tw, 24);
+        ctx.fillStyle = "#a84040"; ctx.fillRect(tx2 + 3, ty2 + 3, tw - 6, 14);
+        ctx.fillStyle = "#f2f2ee"; ctx.fillRect(tx2 + 8, ty2 + 6, 7, 5);
+        ctx.fillStyle = "#e05858"; ctx.fillRect(tx2 + tw - 14, ty2 + 6, 6, 7);
+      });
+      // playplace entry glow
+      ctx.fillStyle = "#f5c542"; ctx.fillRect(546, 124, 8, 48);
+      drawTextC("PLAYPLACE", 512, 112, "#f5c542");
+      // papero, on the floor near the tables
+      drawSpr(paperoSpr, 336, 246, {});
+    },
+    npcs: [
+      { id:"glorp", x:280, y:108, spr:congoerSpr, w:12, h:12, solid:true, name:"GLORP",
+        dlg(){
+          if (!G.flags.mcronaldDone) return [
+            { t:"GLORP THE NIGHT-FRYER HASN'T LEFT HIS POST SINCE THE LIGHTS DIED. 'THE FRYERS KEEP ME WARM. THE CLOWN KEEPS ME HUMBLE.'", fn: wacShop }
+          ];
+          return [{ t:"GLORP: LIGHTS ARE BACK. CLOWN'S CALM. MACHINE'S 'OPEN'. THIS IS THE BEST SHIFT OF MY LIFE.", fn: wacShop }];
+        } },
+      { id:"machine", x:78, y:122, spr:null, w:30, h:10, sign:true, noDraw:true,
+        dlg(){
+          if (!G.flags.mcronaldDone) return [
+            { t:"THE ICE CREAM MACHINE HUMS IN THE DARK. A HANDWRITTEN SIGN: 'BROKEN.'" },
+            { t:"THE MACHINE, VERY QUIETLY: I'M NOT BROKEN. I'M RESTING." },
+            { p:"mega", name:"MEGAFIRE", t:"EVEN THE APPLIANCES HERE NEED A THERAPIST. I'VE NEVER FELT SO SEEN." }
+          ];
+          if (!G.flags.coneGiven){
+            if (G.inv.length >= 8) return [{ t:"THE MACHINE WHIRS, READY TO DISPENSE A CELEBRATORY CONE... BUT YOUR POCKETS ARE FULL. IT UNDERSTANDS. IT WAITS." }];
+            G.flags.coneGiven = 1; G.inv.push("cone");
+            SFX.heal();
+            return [
+              { t:"THE MACHINE WHIRS TO LIFE AND EXTRUDES ONE PERFECT SWIRL. YOU GOT THE SOFT CONE!" },
+              { t:"THE MACHINE: I WAS NEVER BROKEN. I WAS WAITING FOR SOMEONE WORTH THE SWIRL." }
+            ];
+          }
+          return [{ t:"THE MACHINE HUMS A CONTENT LITTLE TUNE. IT HAS NEVER BEEN BROKEN A DAY IN ITS LIFE." }];
+        } },
+      { id:"papero", x:340, y:252, spr:null, w:14, h:10, sign:true, noDraw:true,
+        dlg(){ return [{ t:"I'M PAPERO." }]; } },
+      { id:"wacsign", x:470, y:150, spr:null, w:14, h:12, sign:true, noDraw:true,
+        dlg(){ return [{ t:"A SIGN SHAPED LIKE A FRY BOX: 'PLAYPLACE THIS WAY. SHOES OFF. SINS OFF. NO LIFEGUARD ON DUTY.'" }]; } }
+    ],
+    saves: [ { x:320, y:160 } ],
+    exits: [
+      { x:258, y:292, w:40, h:8, to:"street", tx:266, ty:83, dir:"down" },
+      { x:552, y:120, w:8, h:56, to:"playplace", tx:30, ty:150, dir:"right" }
+    ],
+    spawns: [
+      { id:"wac_burg", x:360, y:180, spr:burgSpr, group:"wac1",
+        patrol:{ axis:"x", range:34, spd:0.025 }, flag:"e_wac1" },
+      { id:"wac_fry", x:150, y:250, spr:frySpr, group:"wac2",
+        patrol:{ axis:"y", range:20, spd:0.03 }, flag:"e_wac2" }
+    ]
+  },
+  playplace: {
+    w: 320, h: 240, music: "wac", dark: () => !G.flags.mcronaldDone,
+    floor: "#26343e",
+    walls: [
+      { x:0, y:0, w:320, h:70 }, { x:0, y:226, w:320, h:14 },
+      { x:0, y:0, w:14, h:120 }, { x:0, y:176, w:14, h:124 },
+      { x:306, y:0, w:14, h:240 },
+      { x:230, y:70, w:60, h:40 }  // the slide tower
+    ],
+    deco(){
+      diamondFloor(320, 240, "#2e3e4a", 18);
+      wallFace(0, 0, 320, 70, "#16222a", "#243440");
+      drawTextC("THE PLAYPLACE", 160, 14, "#f5c542");
+      // ball pit
+      ctx.fillStyle = "#1a2630"; ctx.fillRect(60, 96, 200, 70);
+      const cols = ["#e05858", "#58a0e0", "#f5c542", "#58c858"];
+      for (let i = 0; i < 60; i++){
+        const bx = 66 + ((i * 37) % 190), by = 100 + ((i * 53) % 60);
+        ctx.fillStyle = cols[i % 4];
+        ctx.fillRect(bx, by + Math.sin(G.t / 30 + i) * 1.5, 5, 5);
+      }
+      // slide tower
+      ctx.fillStyle = "#8a3030"; ctx.fillRect(230, 40, 60, 70);
+      ctx.fillStyle = "#f5c542"; ctx.fillRect(236, 60, 20, 50);
+      ctx.fillStyle = "#a84040"; ctx.fillRect(262, 48, 22, 18);
+      drawTextC("SHOES OFF", 262, 30, "#8a93a8");
+      if (!G.flags.mcronaldDone) drawSpr(mcronaldSpr, 150, 96, {});
+    },
+    npcs: [
+      { id:"mcboss", x:160, y:130, spr:null, w:26, h:14, sign:true, noDraw:true, hideFlag:"mcronaldDone",
+        dlg(){ return preMcronaldScript(); } },
+      { id:"mcafter", x:160, y:130, spr:mcronaldSpr, w:16, h:16, solid:true, name:"DONALD MCRONALD", needFlag:"mcronaldSpared",
+        dlg(){ return [
+          { t:"DONALD MCRONALD SITS IN THE SHALLOW END OF THE BALL PIT, PRACTICING A SMALLER, HONEST SMILE." },
+          { t:"DONALD MCRONALD: RAN RAN RUU. (HE SAYS IT LIKE A THANK-YOU.)" }
+        ]; } },
+      { id:"pitsign", x:60, y:180, spr:null, w:14, h:10, sign:true, noDraw:true,
+        dlg(){ return [{ t:"POOL RULES: NO DIVING. NO SINKING. NO ASKING WHAT'S AT THE BOTTOM." }]; } }
+    ],
+    saves: [],
+    exits: [ { x:0, y:120, w:8, h:56, to:"wacdonalds", tx:526, ty:148, dir:"left" } ],
+    spawns: []
+  }
+});
+
+// ---- ch6 story scripts ----
+function wacArrivalScript(){
+  return [
+    { t:"THE DOOR CHIMES A TWO-NOTE JINGLE. THE AIR IS 60 PERCENT GREASE, 40 PERCENT NOSTALGIA.",
+      sfx(){ [659, 784].forEach((f, i) => tone(f, 0.12, "square", 0.15, 0, i * 0.11)); } },
+    { p:"bob", name:"BOB", t:"A RESTAURANT! A REAL ONE! DO I ORDER? HOW DO I ORDER? WHAT DO BOMBS EAT?" },
+    { t:"AND THEN - EVERY LIGHT IN THE BUILDING DIES AT ONCE. THE MENU BOARDS KEEP GLOWING, LIKE ALTARS." },
+    { p:"mega", name:"MEGAFIRE", t:"SIX. THAT'S SIX DARK WORLDS. I'M NOT EVEN SURPRISED ANYMORE. THAT'S THE SADDEST PART." },
+    { p:"dorko", name:"DORKO", t:"NOBODY ORDER ANYTHING. WE FIND WHOEVER'S DOING THIS, WE FLIP THE LIGHTS, WE LEAVE." },
+    { p:"bmo", name:"BMO", t:"THE SCREAMS ARE COMING FROM THE PLAYPLACE. THE OMINOUS ONES, I MEAN. THE REGULAR PLAYPLACE SCREAMS ARE DIFFERENT." }
+  ];
+}
+function preMcronaldScript(){
+  return [
+    { t:"THE BALL PIT RIPPLES. SOMETHING RISES FROM ITS DEPTHS: RED TUFTS. WHITE FACE. A SMILE YOU CAN HEAR." },
+    { t:"DONALD MCRONALD: WELCOME... TO WACDONALDS. RAN RAN RUU!",
+      sfx(){ [523, 523, 784].forEach((f, i) => tone(f, 0.12, "square", 0.16, 0, i * 0.13)); } },
+    { p:"bob", name:"BOB", t:"HE KNOWS OUR ORDER. I CAN FEEL HIM KNOWING OUR ORDER." },
+    { p:"dorko", name:"DORKO", t:"HE'S BETWEEN US AND THE LIGHT SWITCH. THAT MAKES HIM BOSS NUMBER SIX." },
+    { fn(){ startBattle("mcronaldFight", null); }, t:"DONALD MCRONALD SPRINGS FROM THE BALL PIT, POSING WITH TERRIBLE JOY!" }
+  ];
+}
+function postMcronaldScript(){
+  if (G.flags.mcronaldSpared){
+    return [
+      { t:"THE LIGHTS SLAM BACK ON. THE FRYERS SING. SOMEWHERE, THE ICE CREAM MACHINE CLEARS ITS THROAT.",
+        sfx(){ SFX.heal(); [523, 659, 784, 1047].forEach((f, i) => tone(f, 0.1, "square", 0.13, 0, i * 0.08)); } },
+      { t:"DONALD MCRONALD POSES IN THE SHALLOW END OF THE BALL PIT, RADIANT." },
+      { t:"DONALD MCRONALD: RAN RAN RUU... RAN RAN RUU! THE CHANT IS YOURS NOW. USE IT WISELY. USE IT RARELY." },
+      { p:"bob", name:"BOB", t:"I WENT IN THE BALL PIT DURING THE FIGHT. I AM FULL OF BALLS. ZERO REGRETS." },
+      { p:"dorko", name:"DORKO", t:"SIX WORLDS. THAT'S A CAREER. THE MOBILE'S OUTSIDE. WE DRIVE HOME AND WE NEVER PARK ANYWHERE AGAIN.",
+        fn(){ G.flags.wacRelit = 1; saveGame(); } }
+    ];
+  }
+  return [
+    { t:"THE LIGHTS COME BACK SLOWLY, LIKE THEY'RE NOT SURE THEY SHOULD.", sfx(){ SFX.heal(); } },
+    { t:"THE BALL PIT IS STILL. THE MENU BOARDS HUM. NOBODY CHANTS." },
+    { p:"mega", name:"MEGAFIRE", t:"HE JUST WANTED A CROWD. WE WERE A CROWD. WE COULD HAVE JUST... CHANTED." },
+    { p:"dorko", name:"DORKO", t:"MOBILE. OUTSIDE. HOME. NOW.",
+      fn(){ G.flags.wacRelit = 1; saveGame(); } }
+  ];
+}
+function finalDriveScript(){
+  if (!G.flags.mcronaldDone) return [
+    { p:"dorko", name:"DORKO", t:"NOT YET. THERE'S A WACDONALDS BACK THERE WITH THE LIGHTS OFF AND A CLOWN IN THE DARK. LOOSE ENDS FOLLOW YOU HOME." }
+  ];
+  return [
+    { t:"THE PIZZA-MOBILE. STILL WARM. STILL SMELLS LIKE OREGANO AND DESTINY. DRIVE HOME - FOR REAL THIS TIME?", choices:[
+      { t:"DRIVE HOME", fn(){
+          say([
+            { p:"dorko", name:"DORKO", t:"SIX DARK WORLDS. ONE BAG OF ROLLS. ZERO REGRETS. ...SOME REGRETS. GET IN." },
+            { p:"mega", name:"MEGAFIRE", t:"IF THE GARAGE IS A DARK WORLD WHEN WE GET BACK, I LIVE IN THIS CAR NOW." },
+            { p:"bob", name:"BOB", t:"FIRST I WAS FLUSHED. NOW I HAVE A SEAT WITH MY NAME ON IT. WHAT A WORLD." },
+            { p:"bmo", name:"BMO", t:"CREDITS? ROLL 'EM. PIZZA? ROLL 'EM. US? ROLLING OUT." },
+            { t:"THE PIZZA-MOBILE PULLS AWAY INTO THE EVENING. SOMEWHERE BEHIND YOU, A CLOWN CHANTS SOFTLY AT THE SUN." }
+          ], () => {
+            G.flags.ch6Done = 1;
             G.flags.endRoute = endRoute();
             saveGame();
             stopMusic();
@@ -6312,7 +6976,7 @@ function logoutScript(){
             playJingle("victory");
           });
         } },
-      { t:"NOT YET", fn(){ say([{ p:"bob", name:"BOB", t:"SURE! ONE MORE LAP! I LOVE LAPS! I'VE NEVER HAD FRIENDS TO LAP WITH!" }]); } }
+      { t:"NOT YET", fn(){ say([{ p:"bob", name:"BOB", t:"MORE STREET TIME! I LOVE THE STREET! THE STREET IS WHERE FRIENDS HAPPEN!" }]); } }
     ] }
   ];
 }
@@ -6587,7 +7251,8 @@ function drawEnd(){
             : route === "violent" ? ["THE COLD ENDING", "#9fd8f0"]
             : ["THE SNACK ENDING", "#ffe14a"];
   drawTextC(sub[0], 160, 36, sub[1]);
-  if (G.flags.ch5Done) drawTextC("ALL FIVE CHAPTERS COMPLETE", 160, 46, "#e040c0");
+  if (G.flags.ch6Done) drawTextC("ALL SIX CHAPTERS COMPLETE", 160, 46, "#e040c0");
+  else if (G.flags.ch5Done) drawTextC("CHAPTERS 1 + 2 + 3 + 4 + 5 COMPLETE", 160, 46, "#e040c0");
   else if (G.flags.ch4Done) drawTextC("CHAPTERS 1 + 2 + 3 + 4 COMPLETE", 160, 46, "#e040c0");
   else if (G.flags.ch3Done) drawTextC("CHAPTERS 1 + 2 + 3 COMPLETE", 160, 46, "#e040c0");
   else if (G.flags.ch2Done) drawTextC("CHAPTERS 1 + 2 COMPLETE", 160, 46, "#e040c0");
@@ -6615,6 +7280,10 @@ function drawEnd(){
   if (G.flags.ch5Done){
     friends.push(mrpSpr);
     if (G.flags.doughmerSpared && route !== "violent") friends.push(doughmerSpr);
+  }
+  if (G.flags.ch6Done){
+    friends.push(paperoSpr);
+    if (G.flags.mcronaldSpared && route !== "violent") friends.push(mcronaldSpr);
   }
   const drawRow = (row, baseY) => {
     const gap = row.length > 12 ? 2 : row.length > 9 ? 3 : 6;
