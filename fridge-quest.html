@@ -6653,6 +6653,9 @@ Object.assign(ROOMS, {
       ctx.fillStyle = "#c03028"; ctx.beginPath(); ctx.arc(487, 179, 2.4, 0, 7); ctx.arc(494, 183, 2.4, 0, 7); ctx.fill();
       ctx.fillStyle = "#1c1c24"; ctx.fillRect(458, 194, 14, 8); ctx.fillRect(506, 194, 14, 8);
       drawTextC("PIZZA-MOBILE", 490, 148, "#e8b040");
+      // the fire hydrant that has seen things
+      ctx.fillStyle = "#c03028"; ctx.fillRect(186, 88, 8, 10);
+      ctx.fillStyle = "#e05858"; ctx.fillRect(184, 90, 12, 3); ctx.fillRect(188, 85, 4, 3);
     },
     npcs: [
       { id:"mobile6", x:490, y:208, spr:null, w:60, h:12, sign:true, noDraw:true,
@@ -6898,7 +6901,7 @@ Object.assign(ROOMS, {
     npcs: [
       { id:"mcboss", x:160, y:130, spr:null, w:26, h:14, sign:true, noDraw:true, hideFlag:"mcronaldDone",
         dlg(){ return preMcronaldScript(); } },
-      { id:"mcafter", x:160, y:130, spr:mcronaldSpr, w:16, h:16, solid:true, name:"DONALD MCRONALD", needFlag:"mcronaldSpared",
+      { id:"mcafter", x:220, y:150, spr:mcronaldSpr, w:16, h:16, solid:true, name:"DONALD MCRONALD", needFlag:"mcronaldSpared",
         dlg(){ return [
           { t:"DONALD MCRONALD SITS IN THE SHALLOW END OF THE BALL PIT, PRACTICING A SMALLER, HONEST SMILE." },
           { t:"DONALD MCRONALD: RAN RAN RUU. (HE SAYS IT LIKE A THANK-YOU.)" }
