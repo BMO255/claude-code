@@ -1,0 +1,109 @@
+{
+  "id": "couch_guy",
+  "nodes": {
+    "start": {
+      "speaker": "Couch Guy",
+      "text": [
+        "...",
+        "Mm.",
+        "...you're standing in front of the— you're standing."
+      ],
+      "choices": [
+        { "text": "What do you want?", "next": "want" },
+        { "text": "What are you watching?", "next": "watching" },
+        { "text": "How long have you been here?", "next": "how_long", "once": true },
+        { "text": "Bye.", "next": "bye" }
+      ]
+    },
+    "want": {
+      "speaker": "Couch Guy",
+      "text": "Could you make me a sandwich.",
+      "set_flag": "knows_sandwich",
+      "next": "want2"
+    },
+    "want2": {
+      "speaker": "Couch Guy",
+      "text": "Kitchen's through there. Through the— it's through.",
+      "next": "want3"
+    },
+    "want3": {
+      "speaker": "Dorko",
+      "text": "He didn't point. He trusts me to find a kitchen. That's the nicest thing anyone's done today.",
+      "choices": [
+        { "text": "What goes on a sandwich?", "next": "recipe" },
+        { "text": "Fine. One sandwich.", "next": null },
+        { "text": "Make it yourself.", "next": "yourself", "once": true }
+      ]
+    },
+    "recipe": {
+      "speaker": "Couch Guy",
+      "text": "Bread. Then the— the middle part. Then bread. Hahaha. Ha.",
+      "next": null
+    },
+    "yourself": {
+      "speaker": "Couch Guy",
+      "text": "I'm not gonna sit here and— sit here.",
+      "next": "yourself2"
+    },
+    "yourself2": {
+      "speaker": "Dorko",
+      "text": "He is, though. He is going to sit here.",
+      "next": null
+    },
+    "watching": {
+      "speaker": "Couch Guy",
+      "text": [
+        "It's the one where he— hahaha. Ha. It's that one.",
+        "The episode. The good— this one.",
+        "Shh. This is the part. This is the— shh."
+      ],
+      "choices": [
+        { "text": "The TV is showing static.", "next": "static", "once": true },
+        { "text": "Enjoy.", "next": null }
+      ]
+    },
+    "static": {
+      "speaker": "Couch Guy",
+      "text": "That's the intro.",
+      "next": null
+    },
+    "how_long": {
+      "speaker": "Couch Guy",
+      "text": "Since the— since.",
+      "next": "how_long2"
+    },
+    "how_long2": {
+      "speaker": "Dorko",
+      "text": "Since. Sure. Same as everything here.",
+      "next": null
+    },
+    "bye": {
+      "speaker": "Couch Guy",
+      "text": "...sandwich.",
+      "next": null
+    },
+    "fed_start": {
+      "speaker": "Couch Guy",
+      "text": [
+        "...",
+        "It was a good sandwich, Will.",
+        "Hahaha. Ha."
+      ],
+      "choices": [
+        { "text": "My name's Dorko.", "next": "fed_name", "once": true },
+        { "text": "What's under the rug?", "next": "fed_rug" },
+        { "text": "Bye.", "next": null }
+      ]
+    },
+    "fed_name": {
+      "speaker": "Couch Guy",
+      "text": "...good sandwich, Will.",
+      "next": null
+    },
+    "fed_rug": {
+      "speaker": "Couch Guy",
+      "text": "Stairs. For guests. You're the— hahaha. Ha. You're the guest.",
+      "next": null
+    }
+  }
+}

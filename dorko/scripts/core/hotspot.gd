@@ -13,6 +13,7 @@ var walk_required := true
 var enabled := true: set = set_enabled
 var on_look := Callable()
 var on_touch := Callable()
+var on_talk := Callable()           # overrides talk_dialogue_id when set
 var on_use_item := Callable()       # func(item_id: String) -> bool
 var visual: CanvasItem = null       # optional sprite to pulse on hover
 var outline_size := Vector2.ZERO    # hover outline half-extents source
@@ -78,7 +79,9 @@ func do_touch() -> void:
 
 
 func do_talk() -> void:
-	if talk_dialogue_id != "":
+	if on_talk.is_valid():
+		on_talk.call()
+	elif talk_dialogue_id != "":
 		DialogueManager.start(talk_dialogue_id)
 	else:
 		DialogueManager.talk_fail()
@@ -87,7 +90,10 @@ func do_talk() -> void:
 func do_use(item_id: String) -> void:
 	var handled := false
 	if on_use_item.is_valid():
-		handled = bool(on_use_item.call(item_id))
+		# Async handlers (ones that await) return a coroutine state object
+		# instead of a bool — treat that as handled; the coroutine owns the rest.
+		var result = on_use_item.call(item_id)
+		handled = result if result is bool else true
 	if not handled:
 		DialogueManager.use_fail()
 

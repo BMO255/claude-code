@@ -198,6 +198,8 @@ func add_hotspot(cfg: Dictionary) -> Hotspot:
 		h.on_use_item = cfg.use_item
 	if cfg.has("on_look"):
 		h.on_look = cfg.on_look
+	if cfg.has("on_talk"):
+		h.on_talk = cfg.on_talk
 	h.talk_dialogue_id = cfg.get("talk", "")
 	h.interact_point = cfg.get("interact", Vector2(h.position.x, clamp(h.position.y, horizon_y + 12.0, 352.0)))
 	h.walk_required = cfg.get("walk_required", true)
