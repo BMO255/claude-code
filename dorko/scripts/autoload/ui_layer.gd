@@ -9,6 +9,7 @@ var _bar: PanelContainer
 var _slots_box: HBoxContainer
 var _bar_pinned := false
 var _pause_panel: CenterContainer
+var _pause_options: VBoxContainer
 var _paused := false
 
 
@@ -240,6 +241,38 @@ func _build_pause_menu() -> void:
 		btn.text = entry[0]
 		btn.pressed.connect(entry[1])
 		vbox.add_child(btn)
+	# collapsible options block (volumes, text speed, VHS, fullscreen)
+	_pause_options = VBoxContainer.new()
+	_pause_options.visible = false
+	_pause_options.custom_minimum_size = Vector2(160, 0)
+	vbox.add_child(_pause_options)
+	for s in [["Master", "master_vol", 0.0, 1.0], ["Music", "music_vol", 0.0, 1.0],
+			["SFX", "sfx_vol", 0.0, 1.0], ["Text Speed", "text_speed", 15.0, 90.0]]:
+		var lbl := Label.new()
+		lbl.text = s[0]
+		lbl.add_theme_font_size_override("font_size", 9)
+		_pause_options.add_child(lbl)
+		var slider := HSlider.new()
+		slider.min_value = s[2]
+		slider.max_value = s[3]
+		slider.step = (s[3] - s[2]) / 100.0
+		slider.value = GameState.settings.get(s[1], s[3])
+		var key: String = s[1]
+		slider.value_changed.connect(func(v):
+			GameState.settings[key] = v
+			GameState.apply_settings()
+			GameState.save_settings())
+		_pause_options.add_child(slider)
+	for c in [["VHS Filter", "vhs_filter"], ["Fullscreen", "fullscreen"]]:
+		var check := CheckBox.new()
+		check.text = c[0]
+		check.button_pressed = GameState.settings.get(c[1], true)
+		var ckey: String = c[1]
+		check.toggled.connect(func(v):
+			GameState.settings[ckey] = v
+			GameState.apply_settings()
+			GameState.save_settings())
+		_pause_options.add_child(check)
 
 
 func toggle_pause() -> void:
@@ -259,8 +292,7 @@ func _on_save() -> void:
 
 
 func _on_options() -> void:
-	# Options panel arrives with the main menu milestone; shared scene.
-	toast("Options live in the main menu for now.")
+	_pause_options.visible = not _pause_options.visible
 
 
 func _on_main_menu() -> void:

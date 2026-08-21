@@ -144,6 +144,27 @@ func run() -> void:
 			if not GameState.get_flag("battle_won"):
 				fail("battle did not reach battle_won after a jab")
 
+	# --- M6: stairs -> real orange room -> credits -> game_completed -> menu
+	if GameState.get_flag("battle_won") and ResourceLoader.exists("res://scenes/ui/ending.tscn"):
+		print("SMOKE: ending flow")
+		var deadline := Time.get_ticks_msec() + 150000
+		var skipped_credits := false
+		while Time.get_ticks_msec() < deadline:
+			await get_tree().create_timer(1.0).timeout
+			if DialogueManager.active:
+				await drain_dialogue()  # the cutscene lines need advancing
+			var top = SceneRouter.top_overlay()
+			if top != null and not skipped_credits and top.has_method("_finish"):
+				await get_tree().create_timer(2.5).timeout  # let the pulse tick a bit
+				top._finish()
+				skipped_credits = true
+			if GameState.get_flag("game_completed"):
+				break
+		if not GameState.get_flag("game_completed"):
+			fail("ending flow did not reach game_completed")
+		else:
+			await get_tree().create_timer(2.0).timeout  # menu reloads
+
 	if ok:
 		print("SMOKE OK")
 		get_tree().quit(0)

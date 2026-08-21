@@ -11,6 +11,10 @@ var _options_panel: PanelContainer
 
 
 func _ready() -> void:
+	# Peek the save so a finished game shows "Play Again" + the real morning
+	# room. Continue/New Game both re-set state anyway.
+	if GameState.has_save() and GameState.flags.is_empty():
+		GameState.load_game()
 	_build_background()
 	_build_title()
 	_build_menu()
@@ -35,21 +39,36 @@ func _launch(room: String) -> void:
 
 
 func _build_background() -> void:
-	# Orange-room-flavored gradient with a big sleeping silhouette.
+	# Orange-room-flavored gradient with a big sleeping silhouette. After the
+	# game is finished, it's the real morning room instead.
+	var completed := GameState.get_flag("game_completed")
 	var bg := ColorRect.new()
 	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
-	bg.color = Color(0.75, 0.4, 0.12)
+	bg.color = Color(0.95, 0.6, 0.22) if completed else Color(0.75, 0.4, 0.12)
 	add_child(bg)
 	var floor_rect := ColorRect.new()
 	floor_rect.position = Vector2(0, 230)
 	floor_rect.size = Vector2(640, 130)
-	floor_rect.color = Color(0.45, 0.28, 0.16)
+	floor_rect.color = Color(0.55, 0.36, 0.2) if completed else Color(0.45, 0.28, 0.16)
 	add_child(floor_rect)
 	var glow := ColorRect.new()
 	glow.position = Vector2(0, 200)
 	glow.size = Vector2(640, 30)
-	glow.color = Color(0.85, 0.5, 0.18)
+	glow.color = Color(0.98, 0.7, 0.3) if completed else Color(0.85, 0.5, 0.18)
 	add_child(glow)
+	if completed:
+		# the toothless sun, up and about
+		var sun := AssetLib.get_or_build("menu_real_sun", func():
+			var p: Painter = AssetLib.painter(20, 20, 2)
+			p.circle(10, 10, 7, Color(1.0, 0.92, 0.55))
+			p.circle(10, 10, 5, Color(1.0, 0.98, 0.8))
+			return p.tex())
+		var sun_rect := TextureRect.new()
+		sun_rect.texture = sun
+		sun_rect.position = Vector2(70, 40)
+		add_child(sun_rect)
+	if completed:
+		return  # morning room: nobody's asleep on the floor anymore
 	# sleeping Dorko: shell + afro seen from the side, on the floor
 	var doze := AssetLib.get_or_build("menu_doze", func():
 		var p: Painter = AssetLib.painter(60, 30, 2)
@@ -87,8 +106,9 @@ func _build_title() -> void:
 		add_child(lbl)
 		_title_letters.append(lbl)
 	var sub := Label.new()
-	sub.text = "you were supposed to be somewhere"
-	sub.position = Vector2(228, 120)
+	sub.text = "you were exactly where you were supposed to be" \
+		if GameState.get_flag("game_completed") else "you were supposed to be somewhere"
+	sub.position = Vector2(200, 120)
 	sub.add_theme_color_override("font_color", Color(1, 0.85, 0.55, 0.7))
 	add_child(sub)
 
