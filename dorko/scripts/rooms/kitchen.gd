@@ -216,6 +216,12 @@ func _use_on_toaster(item_id: String) -> bool:
 		return true
 	_toasting = false
 	_toaster_sprite.modulate = Color.WHITE
+	# The bread might have been combined away during the 3s cycle — no bread,
+	# no toast, no duplication exploit.
+	if not Inventory.has_item("bread"):
+		AudioBus.play_sfx("pop", 0.7)
+		say("The toaster popped on nothing. It felt that. We both felt that.")
+		return true
 	Inventory.remove_item("bread")
 	Inventory.add_item("toast")
 	UILayer.fly_item("toast", Vector2(268, 160))
@@ -261,6 +267,7 @@ func _touch_cabinet() -> void:
 			if Inventory.add_item("ramune_bottle"):
 				UILayer.fly_item("ramune_bottle", Vector2(480, 100))
 				GameState.set_flag("kitchen_ramune_taken")
+				_cabinet_sprite.texture = _cabinet_tex()  # bottle leaves the shelf
 				say("A full ramune. The marble's still sealed in. Somebody's been saving a celebration.")
 		else:
 			say("Empty now, and proud of the scorch mark.")
@@ -295,8 +302,11 @@ func _use_on_cabinet(item_id: String) -> bool:
 
 
 func _cabinet_tex() -> Texture2D:
+	# The open texture bakes in whether the bottle is still on the shelf, so
+	# the cache key has to encode that state too.
 	if GameState.get_flag("cabinet_open"):
-		return AssetLib.get_or_build("kitchen_cabinet_open", func(): return _build_cabinet_tex(true))
+		var key := "kitchen_cabinet_open_empty" if GameState.get_flag("kitchen_ramune_taken") else "kitchen_cabinet_open_full"
+		return AssetLib.get_or_build(key, func(): return _build_cabinet_tex(true))
 	return AssetLib.get_or_build("kitchen_cabinet_shut", func(): return _build_cabinet_tex(false))
 
 

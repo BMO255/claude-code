@@ -72,6 +72,8 @@ func new_game() -> void:
 	current_spawn = "default"
 	_input_locks = 0
 	Inventory.reset()
+	# a held cursor item from a previous run/save-peek must not survive
+	CursorManager.clear_item()
 
 
 func save_game() -> void:

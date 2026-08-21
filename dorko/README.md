@@ -154,7 +154,7 @@ line. Esc skips (and forfeits it).
 | `fridge_opened` | Kitchen fridge opened (EAT → ATE) |
 | `kitchen_bread_taken` / `kitchen_meat_taken` / `kitchen_lettuce_taken` / `kitchen_ramune_taken` | One-shot pickups, Kitchen |
 | `cabinet_open` | Latch melted by the perfect pizza roll |
-| `basement_landed` / `basement_boombox_played` / `basement_tape_taken` / `basement_trophy_taken` | Basement beats |
+| `basement_landed` / `basement_boombox_played` / `basement_tape_taken` / `basement_trophy_taken` / `basement_rag_taken` | Basement beats |
 | `key_jammed` → `fuse_wet` → `bomb_defused` | The three defuse steps |
 | `heater_open` | Water heater panel pried (wet rag path) |
 | `arcade_moved` | GALAXY NIBBLER slid aside |

@@ -31,6 +31,7 @@ var _big_lbl: Label
 var _tooltip: Label
 var _hud: CanvasLayer
 var _swell_stream: AudioStreamWAV  # pre-baked wind-up riser (no mid-fight synth hitch)
+var _windup_tween: Tween = null
 
 
 func _ready() -> void:
@@ -90,6 +91,7 @@ func _windup(dur: float) -> void:
 	_opp_sprite.texture = _opp_tex("windup")
 	AudioBus.play_sfx("swoosh", 0.5, -6.0)
 	var tw := create_tween()
+	_windup_tween = tw  # killed by _undim so a mid-wind-up KO can't re-dim
 	tw.set_parallel(true)
 	tw.tween_property(_dim, "color:a", 0.38, dur * 0.8)
 	tw.tween_property(_opp, "scale", Vector2(1.06, 1.06), dur)
@@ -99,6 +101,9 @@ func _windup(dur: float) -> void:
 
 
 func _undim() -> void:
+	if _windup_tween != null and _windup_tween.is_valid():
+		_windup_tween.kill()
+	_windup_tween = null
 	var tw := create_tween()
 	tw.set_parallel(true)
 	tw.tween_property(_dim, "color:a", 0.0, 0.4)
@@ -311,6 +316,11 @@ func _winner_sequence() -> void:
 	AudioBus.play_sfx("tick", 0.8)
 	_show_big("WINNER", Color(1.0, 0.9, 0.2))
 	await _wait(1.6)
+	# Point the save at the conclusion room BEFORE saving: goto_scene never
+	# updates current_room, so without this a post-win save would Continue
+	# into the exit-less turquoise room and soft-lock the run.
+	GameState.current_room = "orange_room_real"
+	GameState.current_spawn = "default"
 	GameState.set_flag("battle_won")
 	GameState.save_game()
 	if ResourceLoader.exists("res://scenes/ui/ending.tscn"):

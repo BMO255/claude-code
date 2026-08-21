@@ -57,7 +57,8 @@ func _process(_delta: float) -> void:
 		return
 	var mouse := get_viewport().get_mouse_position()
 	var want_shown := (_bar_pinned or mouse.y > 348.0 or (_bar.position.y < BAR_HIDDEN_Y - 2.0 and mouse.y > 300.0)) \
-		and not DialogueManager.active and not SceneRouter.has_overlay()
+		and not DialogueManager.active and not SceneRouter.has_overlay() \
+		and GameState.current_room != ""  # no inventory bar over menus/cutscene scenes
 	var target := BAR_SHOWN_Y if want_shown else BAR_HIDDEN_Y
 	_bar.position.y = lerp(_bar.position.y, target, 0.25)
 

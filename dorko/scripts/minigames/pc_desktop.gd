@@ -68,8 +68,10 @@ var _hold_cursor: ColorRect = null
 var _hold_time: Label = null
 var _vm_player: AudioStreamPlayer = null
 var _vm_label: Label = null
-var _vm_stream: AudioStreamWAV = null
-var _shutdown_wav: AudioStreamWAV = null
+# static: synthesized once per app session, not once per overlay visit
+# (the voicemail is ~10s of samples — regenerating it every PC boot hitches)
+static var _vm_stream: AudioStreamWAV = null
+static var _shutdown_wav: AudioStreamWAV = null
 
 
 func _ready() -> void:

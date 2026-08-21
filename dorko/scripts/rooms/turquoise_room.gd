@@ -53,13 +53,22 @@ func _room_setup() -> void:
 
 func _on_room_entered() -> void:
 	if GameState.get_flag("battle_won"):
-		# shouldn't normally happen (the ending pulls you forward), but saves
-		# are honest: the figure is gone, the hum continues.
+		# A save landed here after the fight: the figure is gone, and the room
+		# has no exits — carry the player forward into the conclusion.
 		_figure.visible = false
+		await get_tree().create_timer(1.2).timeout
+		if is_inside_tree():
+			SceneRouter.goto_scene("res://scenes/ui/ending.tscn")
 		return
 	await get_tree().create_timer(1.5).timeout
-	if not is_inside_tree() or DialogueManager.active:
+	if not is_inside_tree():
 		return
+	# If the player got a look-line open in the first moment, wait it out —
+	# giving up here would strand them in a room with no exits.
+	while DialogueManager.active:
+		await get_tree().create_timer(0.5).timeout
+		if not is_inside_tree():
+			return
 	if GameState.get_flag("monologue_done"):
 		_to_battle()
 		return

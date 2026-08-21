@@ -13,6 +13,14 @@ var _bulb_sprite: Sprite2D
 var _heater_sprite: Sprite2D
 var _wall_msg: Label
 var _busy := false
+var _phone_players: Array = []  # stopped on room exit so loops can't leak
+
+
+func _exit_tree() -> void:
+	for p in _phone_players:
+		if p != null and is_instance_valid(p):
+			p.stop()
+	_phone_players.clear()
 
 
 func _room_config() -> void:
@@ -297,12 +305,16 @@ func _touch_phone() -> void:
 		SfxSynth.tone(350.0, 2.2, "sine", 0.12, 0.02, 0.4),
 		SfxSynth.tone(440.0, 2.2, "sine", 0.12, 0.02, 0.4),
 	])), 1.0, -6.0)
+	_phone_players.append(tone_player)
 	await get_tree().create_timer(2.0).timeout
 	if not is_inside_tree():
 		return
 	if tone_player and is_instance_valid(tone_player):
 		tone_player.stop()
+	# NOTE: the hold track is loop-enabled — it MUST be tracked in
+	# _phone_players so _exit_tree can stop it if the player walks out mid-call.
 	var hold := AudioBus.play_stream(AssetLib.music("hold"), 1.0, -10.0)
+	_phone_players.append(hold)
 	await get_tree().create_timer(2.6).timeout
 	if hold and is_instance_valid(hold):
 		hold.stop()
@@ -374,9 +386,22 @@ func _look_heater() -> void:
 
 func _touch_heater() -> void:
 	if GameState.get_flag("heater_open"):
-		say("Warm inside. Wet. I already took the best rag.")
+		if not GameState.get_flag("basement_rag_taken"):
+			_try_take_rag()
+		else:
+			say("Warm inside. Wet. I already took the best rag.")
 	else:
 		say("The panel's bolted shut. Finger-proof. I'd need something flat, stiff, and expendable.")
+
+
+## Guarded pickup: the rag stays claimable until it actually fits in a pocket.
+func _try_take_rag() -> void:
+	if Inventory.add_item("wet_rag"):
+		GameState.set_flag("basement_rag_taken")
+		UILayer.fly_item("wet_rag", Vector2(452, 200))
+		say("One professionally damp rag, acquired.")
+	else:
+		say("The rag's right there. My pockets voted no. Democracy.")
 
 
 func _use_on_heater(item_id: String) -> bool:
@@ -392,8 +417,11 @@ func _use_on_heater(item_id: String) -> bool:
 	GameState.set_flag("heater_open")
 	_heater_sprite.texture = AssetLib.get_or_build("base_heater_open", func(): return _build_heater_tex(true))
 	if Inventory.add_item("wet_rag"):
+		GameState.set_flag("basement_rag_taken")
 		UILayer.fly_item("wet_rag", Vector2(452, 200))
-	say("Pried it open. The trophy bent. Still says PARTICIPANT. Truer than ever. And inside: one professionally damp rag.")
+		say("Pried it open. The trophy bent. Still says PARTICIPANT. Truer than ever. And inside: one professionally damp rag.")
+	else:
+		say("Pried it open. There's a damp rag in there — it can wait until my pockets can.")
 	return true
 
 
