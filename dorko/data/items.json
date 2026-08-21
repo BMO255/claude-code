@@ -1,0 +1,127 @@
+{
+  "items": [
+    {
+      "id": "cold_cheese_slice",
+      "name": "Cold Cheese Slice",
+      "look_text": "A slice of cheese so cold it has stopped being food and started being evidence.",
+      "combinable_with": ["sandwich"]
+    },
+    {
+      "id": "crumpled_card",
+      "name": "Crumpled Birthday Card",
+      "look_text": "\"Happy 2nd Birthday Dorko — 07/14.\" Someone crumpled this on purpose. Probably me.",
+      "combinable_with": []
+    },
+    {
+      "id": "perfect_pizza_roll",
+      "name": "Perfect Pizza Roll",
+      "look_text": "Optimal temperature. Physically impossible.",
+      "combinable_with": []
+    },
+    {
+      "id": "bread",
+      "name": "Bread",
+      "look_text": "Two slices traveling as one item. They've agreed to this.",
+      "combinable_with": ["sliced_meat"]
+    },
+    {
+      "id": "toast",
+      "name": "Toast",
+      "look_text": "Bread that has seen things.",
+      "combinable_with": ["sliced_meat"]
+    },
+    {
+      "id": "mystery_meat",
+      "name": "\"Meat\"",
+      "look_text": "The label just says 'meat' in quotes. The quotes are doing a lot of work.",
+      "combinable_with": []
+    },
+    {
+      "id": "sliced_meat",
+      "name": "Sliced \"Meat\"",
+      "look_text": "Sliced. The quotes survived the knife.",
+      "combinable_with": ["bread", "toast"]
+    },
+    {
+      "id": "lettuce",
+      "name": "Lettuce",
+      "look_text": "Crisp. Green. The only thing in this house with its life together.",
+      "combinable_with": ["good_sandwich"]
+    },
+    {
+      "id": "sandwich",
+      "name": "Sandwich",
+      "look_text": "The minimum viable sandwich.",
+      "combinable_with": ["cold_cheese_slice"]
+    },
+    {
+      "id": "good_sandwich",
+      "name": "Good Sandwich",
+      "look_text": "Meat and cheese. Now we're cooking. We're not cooking. It's cold.",
+      "combinable_with": ["lettuce"]
+    },
+    {
+      "id": "great_sandwich",
+      "name": "Great Sandwich",
+      "look_text": "Meat, cheese, lettuce. A complete thought.",
+      "combinable_with": []
+    },
+    {
+      "id": "ramune_bottle",
+      "name": "Ramune Bottle",
+      "look_text": "Full. The marble stares back. It's seen the inside of the bottle its whole life.",
+      "combinable_with": []
+    },
+    {
+      "id": "cassette_tape",
+      "name": "Cassette Tape",
+      "look_text": "Hand-labeled: 'sounds (mine)'. The tape is wound to somewhere in the middle of something.",
+      "combinable_with": []
+    },
+    {
+      "id": "plastic_trophy",
+      "name": "Plastic Trophy",
+      "look_text": "PARTICIPANT. No year, no event. Just the concept.",
+      "combinable_with": []
+    },
+    {
+      "id": "wet_rag",
+      "name": "Wet Rag",
+      "look_text": "Dripping with confidence. And water. Mostly water.",
+      "combinable_with": []
+    },
+    {
+      "id": "wind_up_key",
+      "name": "Wind-Up Key",
+      "look_text": "A key for winding something up. Or, in one recent case, for stopping that.",
+      "combinable_with": []
+    }
+  ],
+  "combinations": [
+    {
+      "a": "bread",
+      "b": "sliced_meat",
+      "result": "sandwich",
+      "line": "Assembly complete. It's a sandwich. Legally."
+    },
+    {
+      "a": "toast",
+      "b": "sliced_meat",
+      "result": "sandwich",
+      "set_flag": "sandwich_toasted",
+      "line": "Toasted. The crunch will mean something to someone."
+    },
+    {
+      "a": "sandwich",
+      "b": "cold_cheese_slice",
+      "result": "good_sandwich",
+      "line": "Upgraded. The cheese is still cold. That's the risk it carries."
+    },
+    {
+      "a": "good_sandwich",
+      "b": "lettuce",
+      "result": "great_sandwich",
+      "line": "A great sandwich. I almost don't want to give this away. Almost."
+    }
+  ]
+}

@@ -1,0 +1,47 @@
+; Engine configuration file.
+; It's best edited using the editor UI and not directly,
+; since the parameters that go here are not all obvious.
+
+config_version=5
+
+[application]
+
+config/name="DORKO"
+config/description="A pseudo-3D point-and-click adventure about a turtle who was supposed to be somewhere."
+run/main_scene="res://scenes/ui/main_menu.tscn"
+config/features=PackedStringArray("4.3")
+config/icon="res://icon.svg"
+
+[audio]
+
+buses/default_bus_layout=""
+
+[autoload]
+
+Boot="*res://scripts/autoload/boot.gd"
+AssetLib="*res://scripts/autoload/asset_lib.gd"
+GameState="*res://scripts/autoload/game_state.gd"
+Inventory="*res://scripts/autoload/inventory.gd"
+AudioBus="*res://scripts/autoload/audio_bus.gd"
+SceneRouter="*res://scripts/autoload/scene_router.gd"
+UILayer="*res://scripts/autoload/ui_layer.gd"
+DialogueManager="*res://scripts/autoload/dialogue_manager.gd"
+CursorManager="*res://scripts/autoload/cursor_manager.gd"
+Fx="*res://scripts/autoload/fx.gd"
+
+[display]
+
+window/size/viewport_width=640
+window/size/viewport_height=360
+window/size/window_width_override=1280
+window/size/window_height_override=720
+window/stretch/mode="canvas_items"
+window/stretch/aspect="keep"
+
+[gui]
+
+theme/default_font_size=10
+
+[rendering]
+
+textures/canvas_textures/default_texture_filter=0
