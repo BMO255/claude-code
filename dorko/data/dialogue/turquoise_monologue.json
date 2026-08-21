@@ -1,0 +1,79 @@
+{
+  "id": "turquoise_monologue",
+  "nodes": {
+    "start": {
+      "speaker": "The Turquoise One",
+      "text": "Dorko. There you are. I've been waiting since your second birthday. I kept the smile warm the whole time.",
+      "next": "n2"
+    },
+    "n2": {
+      "speaker": "The Turquoise One",
+      "text": "Do you like the room? Nothing in it can go wrong. I removed things, one at a time, until that was true. The chair stays. The chair earned it.",
+      "next": "n3"
+    },
+    "n3": {
+      "speaker": "The Turquoise One",
+      "text": "This house is a waiting room. Everyone in it missed their appointment. Nobody misses it by much, you know. That's the part I'd fix, if fixing were my job. My job is the other thing.",
+      "next": "n4"
+    },
+    "n4": {
+      "speaker": "The Turquoise One",
+      "text": "Your housemates. Lessons, all of them. The man on the couch chose to watch. The bomb chose to almost. The computer chose to remember. Lovely, stationary lessons. You walked past every one of them and learned— hm. We'll see what you learned.",
+      "next": "n5"
+    },
+    "n5": {
+      "speaker": "The Turquoise One",
+      "text": "You were supposed to come upstairs, Dorko. Up. The invitation was for up. And you went down. Through the floor, even. Nobody has ever RSVP'd with a trapdoor before. I was almost delighted.",
+      "next": "n6"
+    },
+    "n6": {
+      "speaker": "The Turquoise One",
+      "text": "I'm not angry. I want to be clear about that, because of what comes later. Shells: you wear yours on the outside. Honest. I wear mine on the inside. Also honest. Neither of us can take it off.",
+      "next": "n7"
+    },
+    "n7": {
+      "speaker": "The Turquoise One",
+      "text": "And the afro. We'll get to the afro.",
+      "next": "n8"
+    },
+    "n8": {
+      "speaker": "The Turquoise One",
+      "text": "But first — and I need you to understand this is the most important thing I will say tonight — the pizza rolls.",
+      "next": "n9"
+    },
+    "n9": {
+      "speaker": "The Turquoise One",
+      "text": "Six hundred milliseconds. That is the interval. Whoever chose it chose correctly, and I do not say that about many intervals. One hundred beats per minute: the resting heart rate of someone who has stopped hoping. You cooked a snack to it.",
+      "next": "n10"
+    },
+    "n10": {
+      "speaker": "The Turquoise One",
+      "text": "And then they hand you a hundred milliseconds of grace on either side. A third of the beat, forgiven, in total. That is not rhythm, Dorko. That is charity. In my room the tolerance would be zero milliseconds, and everyone would be happier. Eventually.",
+      "next": "n11"
+    },
+    "n11": {
+      "speaker": "The Turquoise One",
+      "text": "But you made a perfect one anyway. Inside their sloppy little window. I felt it from down here — the house got warmer by an amount I chose not to measure, and I was proud of you, and I hated that, and I filed the hate under the shell with everything else.",
+      "next": "n12"
+    },
+    "n12": {
+      "speaker": "The Turquoise One",
+      "text": "Where was I. Yes. You.",
+      "next": "n13"
+    },
+    "n13": {
+      "speaker": "The Turquoise One",
+      "text": "I'm going to correct you now. The afro comes off, and the shades, and then you'll be smooth, and finished. You've been a draft of yourself for so long, Dorko. Let me publish you.",
+      "next": "n14"
+    },
+    "n14": {
+      "speaker": "The Turquoise One",
+      "text": "It won't hurt. Nothing in this room is allowed to.",
+      "next": "n15"
+    },
+    "n15": {
+      "speaker": "The Turquoise One",
+      "text": "Please hold still. This is the part where you don't have a choice."
+    }
+  }
+}

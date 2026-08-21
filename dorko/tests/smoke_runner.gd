@@ -110,6 +110,8 @@ func run() -> void:
 		if not ResourceLoader.exists(SceneRouter.ROOMS[room_id]):
 			print("SMOKE: skip unbuilt room " + room_id)
 			continue
+		if room_id == "turquoise_room":
+			continue  # covered by the dedicated battle-flow pass below
 		print("SMOKE: room " + room_id)
 		GameState.new_game()
 		await SceneRouter.goto_room(room_id)
@@ -117,6 +119,30 @@ func run() -> void:
 		await drain_dialogue()  # rooms may open with scripted lines
 		if room_id == "orange_room":
 			await _exercise_overlays()
+
+	# --- M5: monologue -> ROUND 1 -> battle scene -> one-hit KO -> the count
+	if ResourceLoader.exists("res://scenes/rooms/turquoise_room.tscn") \
+		and ResourceLoader.exists("res://scenes/minigames/battle.tscn"):
+		print("SMOKE: battle flow")
+		GameState.new_game()
+		await SceneRouter.goto_room("turquoise_room")
+		await get_tree().create_timer(2.2).timeout  # monologue auto-starts at 1.5s
+		if not DialogueManager.active:
+			fail("turquoise monologue did not start")
+		await drain_dialogue()
+		await get_tree().create_timer(3.2).timeout  # ROUND 1 beat + scene change
+		var battle = get_tree().current_scene
+		if battle == null or not battle.scene_file_path.ends_with("battle.tscn"):
+			fail("battle scene did not load after monologue")
+		else:
+			await get_tree().create_timer(1.5).timeout  # intro -> FIGHT
+			battle._jab(-1)
+			for i in 30:
+				await get_tree().create_timer(1.0).timeout
+				if GameState.get_flag("battle_won"):
+					break
+			if not GameState.get_flag("battle_won"):
+				fail("battle did not reach battle_won after a jab")
 
 	if ok:
 		print("SMOKE OK")
