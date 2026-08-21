@@ -64,6 +64,28 @@ func run() -> void:
 		# force it shut so the room tour can proceed
 		DialogueManager._close()
 
+	# --- M2: pizza-roll timing math (pure function; the exact spec windows)
+	var pizza = load("res://scripts/minigames/pizza_roll.gd")
+	if pizza:
+		var t0 := 100000
+		if pizza.classify(t0 + 600, t0) != "PERFECT":
+			fail("pizza classify: exact beat should be PERFECT")
+		if pizza.classify(t0 + 600 + 99, t0) != "OK":
+			fail("pizza classify: +99ms should be OK")
+		if pizza.classify(t0 + 600 - 99, t0) != "OK":
+			fail("pizza classify: -99ms should be OK")
+		if pizza.classify(t0 + 600 + 101, t0) != "MISS":
+			fail("pizza classify: +101ms should be MISS")
+		if pizza.classify(t0 + 600 - 101, t0) != "MISS":
+			fail("pizza classify: -101ms should be MISS")
+		if pizza.classify(t0 - 200, t0) != "":
+			fail("pizza classify: pre-window click should be free")
+
+	# --- M2: keypad knows the birthday backwards
+	var keypad = load("res://scripts/minigames/keypad.gd")
+	if keypad and keypad.CODE != "4170":
+		fail("keypad code is not 4170")
+
 	# --- visit every room that exists
 	print("SMOKE: touring rooms")
 	for room_id in SceneRouter.ROOMS:
@@ -75,6 +97,8 @@ func run() -> void:
 		await SceneRouter.goto_room(room_id)
 		await get_tree().create_timer(1.2).timeout
 		await drain_dialogue()  # rooms may open with scripted lines
+		if room_id == "orange_room":
+			await _exercise_overlays()
 
 	if ok:
 		print("SMOKE OK")
@@ -82,3 +106,20 @@ func run() -> void:
 	else:
 		print("SMOKE FAILED")
 		get_tree().quit(1)
+
+
+## Push each orange-room overlay for a moment so their _ready/_process run
+## headlessly, then pop. Any script error surfaces on stderr.
+func _exercise_overlays() -> void:
+	for path in ["res://scripts/minigames/keypad.gd",
+			"res://scripts/minigames/pc_desktop.gd",
+			"res://scripts/minigames/pizza_roll.gd"]:
+		if not ResourceLoader.exists(path):
+			continue
+		print("SMOKE: overlay " + path.get_file())
+		SceneRouter.push_overlay(load(path).new())
+		await get_tree().create_timer(1.4).timeout
+		if SceneRouter.has_overlay():
+			SceneRouter.pop_overlay()
+		await get_tree().create_timer(0.3).timeout
+		await drain_dialogue()
