@@ -86,6 +86,24 @@ func run() -> void:
 	if keypad and keypad.CODE != "4170":
 		fail("keypad code is not 4170")
 
+	# --- M4: wire panel rules (red -> yellow -> blue; green = the joke)
+	var wires = load("res://scripts/minigames/wire_panel.gd")
+	if wires:
+		if wires.judge([], "red") != "ok":
+			fail("wires: red first should be ok")
+		if wires.judge(["red"], "yellow") != "ok":
+			fail("wires: yellow second should be ok")
+		if wires.judge(["red", "yellow"], "blue") != "done":
+			fail("wires: blue third should finish")
+		if wires.judge([], "green") != "green_trick":
+			fail("wires: green should be the trick")
+		if wires.judge(["red", "yellow"], "green") != "green_trick":
+			fail("wires: green is the trick at any point")
+		if wires.judge([], "yellow") != "wrong":
+			fail("wires: yellow first should be wrong")
+		if wires.judge(["red"], "purple") != "wrong":
+			fail("wires: purple should always be wrong")
+
 	# --- visit every room that exists
 	print("SMOKE: touring rooms")
 	for room_id in SceneRouter.ROOMS:
