@@ -101,6 +101,23 @@ func stop_music(fade := 0.8) -> void:
 		tw.tween_callback(out.stop)
 
 
+# Diegetic audio (the PC's hold music / voicemail) silences the room music,
+# then hands it back when it's done.
+var _ducked_track := ""
+
+
+func duck_music(fade := 0.6) -> void:
+	if current_music != "":
+		_ducked_track = current_music
+		stop_music(fade)
+
+
+func resume_ducked(fade := 1.2) -> void:
+	if _ducked_track != "" and current_music == "":
+		play_music(_ducked_track, fade)
+	_ducked_track = ""
+
+
 # ------------------------------------------------------------------ volume
 
 func set_volume(bus_name: String, linear: float) -> void:

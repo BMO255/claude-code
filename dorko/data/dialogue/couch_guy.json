@@ -6,7 +6,7 @@
       "text": [
         "...",
         "Mm.",
-        "...you're standing in front of the— you're standing."
+        "...you're standing in front of the- you're standing."
       ],
       "choices": [
         { "text": "What do you want?", "next": "want" },
@@ -23,7 +23,7 @@
     },
     "want2": {
       "speaker": "Couch Guy",
-      "text": "Kitchen's through there. Through the— it's through.",
+      "text": "Kitchen's through there. Through the- it's through.",
       "next": "want3"
     },
     "want3": {
@@ -37,12 +37,12 @@
     },
     "recipe": {
       "speaker": "Couch Guy",
-      "text": "Bread. Then the— the middle part. Then bread. Hahaha. Ha.",
+      "text": "Bread. Then the- the middle part. Then bread. Hahaha. Ha.",
       "next": null
     },
     "yourself": {
       "speaker": "Couch Guy",
-      "text": "I'm not gonna sit here and— sit here.",
+      "text": "I'm not gonna sit here and- sit here.",
       "next": "yourself2"
     },
     "yourself2": {
@@ -53,9 +53,9 @@
     "watching": {
       "speaker": "Couch Guy",
       "text": [
-        "It's the one where he— hahaha. Ha. It's that one.",
-        "The episode. The good— this one.",
-        "Shh. This is the part. This is the— shh."
+        "It's the one where he- hahaha. Ha. It's that one.",
+        "The episode. The good- this one.",
+        "Shh. This is the part. This is the- shh."
       ],
       "choices": [
         { "text": "The TV is showing static.", "next": "static", "once": true },
@@ -69,7 +69,7 @@
     },
     "how_long": {
       "speaker": "Couch Guy",
-      "text": "Since the— since.",
+      "text": "Since the- since.",
       "next": "how_long2"
     },
     "how_long2": {
@@ -102,7 +102,7 @@
     },
     "fed_rug": {
       "speaker": "Couch Guy",
-      "text": "Stairs. For guests. You're the— hahaha. Ha. You're the guest.",
+      "text": "Stairs. For guests. You're the- hahaha. Ha. You're the guest.",
       "next": null
     }
   }

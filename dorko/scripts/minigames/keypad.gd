@@ -1,14 +1,15 @@
 extends Control
-## Keypad overlay for the orange room's door. The code is 4170 — Dorko's
-## birthday (07/14) backwards, per the sticky note behind the poster and the
-## crumpled card in the wastebasket. Wrong answers get laughed at.
+## Keypad overlay for the orange room's door. The code is 0929 - Dorko's
+## birthday as mmdd (09/29), per the sticky note behind the poster ("mmdd to
+## get out bday boy") and the crumpled card in the wastebasket. Wrong answers
+## get laughed at.
 ##
 ## Push with: SceneRouter.push_overlay(load("res://scripts/minigames/keypad.gd").new())
 ## Handles its own Esc (overlays must). Digits also type from the keyboard.
 
-const CODE := "4170"
+const CODE := "0929"
 const MAX_DIGITS := 4
-const SUCCESS_LINE := "My own birthday, backwards. This door knew me before I did."
+const SUCCESS_LINE := "My own birthday. Month, then day. The door knew me all along."
 const TAUNTS := ["HA HA HA", "NO.", "COLDER", "NOT IT", "HA. NO."]
 
 # 3x5 pixel glyphs for the chunky button faces (and the scratched-in "HA").
@@ -182,7 +183,7 @@ func _end_taunt() -> void:
 
 
 func _finish_open() -> void:
-	# pop first (frees us at frame end), then the line — both synchronous,
+	# pop first (frees us at frame end), then the line - both synchronous,
 	# so nothing here ever awaits on a freed node.
 	SceneRouter.pop_overlay()
 	DialogueManager.dorko(SUCCESS_LINE)
@@ -248,7 +249,7 @@ func _build_plate_tex() -> Texture2D:
 	for s in [Vector2i(3, 3), Vector2i(84, 3), Vector2i(3, 120), Vector2i(84, 120)]:
 		p.dot(s.x, s.y, Color(0.3, 0.3, 0.35))
 		p.dot(s.x, s.y - 1, Color(0.7, 0.7, 0.75))
-	# speaker slots — this is where the laugh comes from
+	# speaker slots - this is where the laugh comes from
 	p.hline(58, 34, 22, Color(0.3, 0.3, 0.34))
 	p.hline(58, 36, 22, Color(0.3, 0.3, 0.34))
 	# something scratched "HA" next to the speaker, some time ago

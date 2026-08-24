@@ -91,7 +91,7 @@ func do_use(item_id: String) -> void:
 	var handled := false
 	if on_use_item.is_valid():
 		# Async handlers (ones that await) return a coroutine state object
-		# instead of a bool — treat that as handled; the coroutine owns the rest.
+		# instead of a bool - treat that as handled; the coroutine owns the rest.
 		var result = on_use_item.call(item_id)
 		handled = result if result is bool else true
 	if not handled:

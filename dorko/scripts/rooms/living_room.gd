@@ -8,11 +8,11 @@ const BARKS := [
 	"Could you make me a sandwich.",
 	"Could you make me a sandwich.",
 	"Could you make me a sandwich.",
-	"Will. Will. W— Will.",
-	"I'm not gonna sit here and— sit here.",
+	"Will. Will. W- Will.",
+	"I'm not gonna sit here and- sit here.",
 	"Hahaha. Ha.",
-	"In West— in— in West—",
-	"That's my— that's m— sandwich.",
+	"In West- in- in West-",
+	"That's my- that's m- sandwich.",
 	"Uncle. Uncle. Uncle.",
 ]
 
@@ -21,19 +21,19 @@ const SUBTITLES := [
 	"my life got flipped",
 	"flipped",
 	"flipped",
-	"turned upside d—",
+	"turned upside d-",
 	"CAROLINE",
 	"will",
 	"WILL",
 	"WILLLL",
-	"we were on a BREAK a BREAK a BR—",
+	"we were on a BREAK a BREAK a BR-",
 	"[audience knows something]",
 	"the uncle returns tonight",
 	"he's BACK and he's [static]",
 	"laugh. laugh now.",
 	"sandwich sandwich sandwich sandwich",
 	"D-D-D-DINNER TIME",
-	"who ate the— WHO ATE THE—",
+	"who ate the- WHO ATE THE-",
 	"[applause reversed]",
 ]
 
@@ -109,34 +109,37 @@ func _build_walls() -> void:
 
 
 func _build_rug() -> void:
+	# shifted right of center so the foreground TV doesn't sit on the secret
 	_rug_sprite = Sprite2D.new()
 	_rug_sprite.texture = AssetLib.get_or_build("living_rug", _build_rug_tex)
-	_rug_sprite.position = Vector2(320, 306)
+	_rug_sprite.position = Vector2(365, 306)
 	_rug_sprite.z_index = -450
 	bg.add_child(_rug_sprite)
 	_rug_hs = add_hotspot({
 		"name": "Rug",
-		"pos": Vector2(320, 306),
+		"pos": Vector2(365, 306),
 		"size": Vector2(120, 42),
 		"look": "There's a draft coming up through it. Rugs shouldn't breathe.",
 		"touch": _touch_rug,
 		"visual": _rug_sprite,
-		"interact": Vector2(320, 330),
+		"interact": Vector2(365, 332),
 	})
 
 
 func _build_tv() -> void:
-	# stand + CRT on the left, angled at the couch
-	var stand := add_prop(AssetLib.get_or_build("living_tv_stand", _build_stand_tex), Vector2(140, 232))
+	# The TV sits in the FOREGROUND, planted right in front of the couch guy,
+	# screen toward the camera (he watches it; we watch it over its shoulder).
+	# Its ground line (y=356) keeps it drawn in front of him (his z is ~272).
+	var stand := add_prop(AssetLib.get_or_build("living_tv_stand", _build_stand_tex), Vector2(230, 312))
 	_tv = TvScreen.new()
-	# stand sprite is 112x88 centered at (140,232): top-left (84,188); the CRT's
-	# inner screen rect starts 6px in from that and is exactly 88x40.
-	_tv.position = Vector2(90, 194)
-	_tv.z_index = 277  # one over the stand's ground-line z
+	# stand sprite is 112x88 centered at (230,312): top-left (174,268); the
+	# CRT's inner screen rect starts 6px in from that and is exactly 88x40.
+	_tv.position = Vector2(180, 274)
+	_tv.z_index = 357  # one over the stand's ground-line z
 	add_child(_tv)
 	_tv_sub = Label.new()
-	_tv_sub.position = Vector2(52, 240)
-	_tv_sub.size = Vector2(180, 14)
+	_tv_sub.position = Vector2(130, 318)
+	_tv_sub.size = Vector2(200, 14)
 	_tv_sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_tv_sub.add_theme_font_size_override("font_size", 8)
 	_tv_sub.add_theme_color_override("font_color", Color(1.0, 0.95, 0.4))
@@ -147,25 +150,25 @@ func _build_tv() -> void:
 	add_child(_tv_sub)
 	add_hotspot({
 		"name": "TV",
-		"pos": Vector2(140, 216),
-		"size": Vector2(88, 90),
+		"pos": Vector2(230, 296),
+		"size": Vector2(104, 84),
 		"look": [
 			"Wood-paneled. The wood is a sticker. The panel is also, somehow, a sticker.",
 			"It only gets one channel, and the channel is wrong.",
 		],
 		"touch": _touch_tv,
 		"visual": stand,
-		"interact": Vector2(150, 278),
+		"interact": Vector2(304, 334),
 	})
 	# Ultra Cube 64 on the stand's shelf
 	add_hotspot({
 		"name": "Ultra Cube 64",
-		"pos": Vector2(140, 244),
-		"size": Vector2(52, 24),
+		"pos": Vector2(230, 340),
+		"size": Vector2(56, 26),
 		"look": "The cartridge slot is breathing.",
 		"touch": func(): say("I pressed the power button. The button and I both understood nothing would happen."),
 		"use_item": _use_on_cube,
-		"interact": Vector2(150, 278),
+		"interact": Vector2(304, 334),
 	})
 
 
@@ -262,7 +265,7 @@ func _touch_tv() -> void:
 	AudioBus.play_sfx("static_burst", randf_range(0.8, 1.3), -8.0)
 	if _tv.mode == "static":
 		_tv.set_mode("show")
-		say("Channel F. The only channel. F for— it doesn't say.")
+		say("Channel F. The only channel. F for- it doesn't say.")
 	else:
 		_tv.reroll_moment()
 	_set_subtitle(SUBTITLES.pick_random())
@@ -340,7 +343,7 @@ func _deliver_sandwich(item_id: String) -> void:
 		"great_sandwich":
 			lines.append(["Couch Guy", "...Thank you, Will. That was the whole episode."])
 		"good_sandwich":
-			lines.append(["Couch Guy", "...Thank you, Will. There's cheese in it. There's— thank you."])
+			lines.append(["Couch Guy", "...Thank you, Will. There's cheese in it. There's- thank you."])
 		_:
 			lines.append(["Couch Guy", "...Thank you, Will."])
 	if toasted:
@@ -358,7 +361,7 @@ func _deliver_sandwich(item_id: String) -> void:
 	_open_trapdoor_visual()
 	AudioBus.play_sfx("trapdoor")
 	Fx.shake(0.3, 5.0)
-	# Dorko's "!" — then the floor files its paperwork.
+	# Dorko's "!" - then the floor files its paperwork.
 	UILayer.float_text(dorko.global_position + Vector2(-6, -84), "!", Color(1.0, 0.9, 0.2))
 	await get_tree().create_timer(1.0).timeout
 	await _fall_through()
@@ -397,7 +400,7 @@ func _fall_through() -> void:
 	AudioBus.play_sfx("fall_whistle")
 	var tw := create_tween()
 	tw.set_parallel(true)
-	tw.tween_property(dorko, "position", Vector2(320, 306), 0.55).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	tw.tween_property(dorko, "position", Vector2(365, 306), 0.55).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
 	tw.tween_property(dorko, "rotation", TAU * 1.5, 0.9)
 	tw.tween_property(dorko, "scale", Vector2(0.1, 0.1), 0.9).set_ease(Tween.EASE_IN)
 	await tw.finished
@@ -565,7 +568,9 @@ func _build_lamp_tex() -> Texture2D:
 
 class TvScreen extends Node2D:
 	## The screen of the CRT. Static by default; "channel F" is a procedurally
-	## glitched sitcom that never resolves into an actual show.
+	## glitched sitcom that never resolves into an actual show. The root draws
+	## the screen rectangle and CLIPS a child canvas to it, so zoomed glitch
+	## moments can never spill outside the CRT's bounds.
 	const W := 44.0 * 2.0
 	const H := 20.0 * 2.0
 
@@ -573,15 +578,20 @@ class TvScreen extends Node2D:
 	var _frame := 0
 	var _timer := 0.0
 	var _hold := 0.1
-	# per-moment show state
+	# per-moment show state (read by the child canvas)
 	var _zoom := 1.0
 	var _zoom_at := Vector2(44, 20)
 	var _invert := false
 	var _pose := 0
 	var _rng := RandomNumberGenerator.new()
+	var _canvas: Node2D
 
 	func _ready() -> void:
-		_rng.seed = 4170
+		_rng.seed = 929
+		clip_children = CanvasItem.CLIP_CHILDREN_AND_DRAW
+		_canvas = TvCanvas.new()
+		_canvas.screen = self
+		add_child(_canvas)
 
 	func set_mode(m: String) -> void:
 		mode = m
@@ -592,7 +602,8 @@ class TvScreen extends Node2D:
 		_zoom_at = Vector2(_rng.randf_range(20, 68), _rng.randf_range(8, 26))
 		_invert = _rng.randf() < 0.18
 		_pose = _rng.randi_range(0, 3)
-		queue_redraw()
+		if _canvas:
+			_canvas.queue_redraw()
 
 	func _process(delta: float) -> void:
 		_timer += delta
@@ -606,49 +617,61 @@ class TvScreen extends Node2D:
 				_hold = [0.1, 0.14, 0.05, 0.3, 0.5][_rng.randi_range(0, 4)]
 				if _rng.randf() < 0.4:
 					reroll_moment()
-			queue_redraw()
+			if _canvas:
+				_canvas.queue_redraw()
 
 	func _draw() -> void:
+		# this rect IS the clip region for everything the canvas draws
 		draw_rect(Rect2(0, 0, W, H), Color(0.02, 0.02, 0.03))
-		if mode == "static":
-			_draw_static()
+
+
+class TvCanvas extends Node2D:
+	## All actual TV imagery. Clipped by the parent TvScreen's rect.
+	var screen  # TvScreen
+
+	func _draw() -> void:
+		var w: float = TvScreen.W
+		var h: float = TvScreen.H
+		if screen.mode == "static":
+			_draw_static(w, h)
 		else:
-			_draw_show()
+			_draw_show(w, h)
 		# scanlines + glass sheen over everything
-		for y in range(0, int(H), 4):
-			draw_rect(Rect2(0, y, W, 1), Color(0, 0, 0, 0.18))
+		for y in range(0, int(h), 4):
+			draw_rect(Rect2(0, y, w, 1), Color(0, 0, 0, 0.18))
 		draw_rect(Rect2(4, 2, 14, 6), Color(1, 1, 1, 0.06))
 
-	func _draw_static() -> void:
+	func _draw_static(w: float, h: float) -> void:
 		var r := RandomNumberGenerator.new()
-		r.seed = _frame  # new noise every frame, deterministic per frame
+		r.seed = screen._frame  # new noise every frame, deterministic per frame
 		for i in 260:
 			var v := r.randf()
-			draw_rect(Rect2(r.randf_range(0, W - 3), r.randf_range(0, H - 2), 3, 2), Color(v, v, v, 0.9))
+			draw_rect(Rect2(r.randf_range(0, w - 3), r.randf_range(0, h - 2), 3, 2), Color(v, v, v, 0.9))
 		if r.randf() < 0.12:  # occasional color bars
 			var bars := [Color(0.9, 0.9, 0.9), Color(0.9, 0.9, 0.2), Color(0.2, 0.9, 0.9),
 				Color(0.2, 0.9, 0.2), Color(0.9, 0.2, 0.9), Color(0.9, 0.2, 0.2), Color(0.2, 0.2, 0.9)]
 			for b in bars.size():
-				draw_rect(Rect2(b * W / 7.0, 0, W / 7.0, H), bars[b])
+				draw_rect(Rect2(b * w / 7.0, 0, w / 7.0, h), bars[b])
 
-	func _draw_show() -> void:
-		# zoomed drawing: place the focus point at screen center, scaled
-		draw_set_transform(Vector2(W / 2, H / 2) - _zoom_at * _zoom, 0.0, Vector2(_zoom, _zoom))
+	func _draw_show(w: float, h: float) -> void:
+		# zoomed drawing: place the focus point at screen center, scaled;
+		# overspill is clipped by the parent, so any zoom stays in the tube
+		draw_set_transform(Vector2(w / 2, h / 2) - screen._zoom_at * screen._zoom, 0.0, Vector2(screen._zoom, screen._zoom))
 		var wall := Color(0.75, 0.6, 0.45)
 		var floor_c := Color(0.5, 0.35, 0.22)
-		if _invert:
+		if screen._invert:
 			wall = wall.inverted()
 			floor_c = floor_c.inverted()
 		draw_rect(Rect2(0, 0, 88, 26), wall)
 		draw_rect(Rect2(0, 26, 88, 14), floor_c)
 		# their window (a show about people who also have a window)
-		draw_rect(Rect2(8, 5, 14, 12), Color(0.55, 0.75, 0.95) if not _invert else Color(0.45, 0.25, 0.05))
+		draw_rect(Rect2(8, 5, 14, 12), Color(0.55, 0.75, 0.95) if not screen._invert else Color(0.45, 0.25, 0.05))
 		draw_rect(Rect2(8, 5, 14, 2), Color(0.4, 0.28, 0.16))
 		# their couch (a show about people who also have a couch)
-		draw_rect(Rect2(30, 18, 30, 10), Color(0.35, 0.45, 0.65) if not _invert else Color(0.65, 0.55, 0.35))
+		draw_rect(Rect2(30, 18, 30, 10), Color(0.35, 0.45, 0.65) if not screen._invert else Color(0.65, 0.55, 0.35))
 		# two silhouette actors, poses jump around per moment
 		var actor := Color(0.1, 0.08, 0.1)
-		match _pose:
+		match screen._pose:
 			0:
 				_actor(Vector2(38, 12), actor)
 				_actor(Vector2(52, 12), actor)
@@ -661,8 +684,8 @@ class TvScreen extends Node2D:
 			_:
 				_actor(Vector2(24, 12), actor)
 		draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
-		if _invert:
-			draw_rect(Rect2(0, 0, W, H), Color(1, 1, 1, 0.06))
+		if screen._invert:
+			draw_rect(Rect2(0, 0, w, h), Color(1, 1, 1, 0.06))
 
 	func _actor(at: Vector2, c: Color) -> void:
 		draw_circle(at, 3.0, c)

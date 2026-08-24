@@ -1,7 +1,7 @@
 extends Node2D
 ## The conclusion, part 1 (spec 8): the Turquoise Room's chair is gone, a door
-## stands open where it was, and stairs go up. Dorko climbs — WASD disabled,
-## this scene walks for him — passing three vignette windows: the Blue Bomb
+## stands open where it was, and stairs go up. Dorko climbs - WASD disabled,
+## this scene walks for him - passing three vignette windows: the Blue Bomb
 ## waving from a real blue window, the Couch Guy standing and laughing with a
 ## sandwich, and the PC playing voicemail_4.wav. At the top: the keypad door,
 ## minus the keypad. He opens it.
@@ -124,7 +124,7 @@ func _show_vignette(which: String) -> void:
 			_caption(panel, "( he waves with his whole body )")
 		"couch":
 			AudioBus.blip(0.5)
-			_caption(panel, "\"Ha. Haha.\"  — warm, this time")
+			_caption(panel, "\"Ha. Haha.\"  - warm, this time")
 		"pc":
 			AudioBus.play_sfx("blip", 1.2, -10.0)
 			await _type_caption(panel, "voicemail_4.wav:  \"You did it. Come home.\"")

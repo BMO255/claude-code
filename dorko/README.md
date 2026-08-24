@@ -49,22 +49,24 @@ battle and ending, and exits 0 printing `SMOKE OK`.
 ### Room 1 — The Orange Room
 1. Dorko wakes up on the carpet. *"...I was supposed to be somewhere."*
 2. **Hand** the **Wastebasket** → take the **Crumpled Birthday Card**
-   (*"Happy 2nd Birthday Dorko — 07/14"*).
+   (*"Happy 2nd Birthday Dorko — 09/29"*).
 3. **Hand** the **Sun Poster** → the corner peels: a sticky note reads
-   *"your birthday backwards"* (sets `saw_note`). The PC's `diary.txt` also
-   hints at it.
-4. **Hand** the **Keypad Door** and enter **4170** (07/14 backwards).
-   Wrong codes get laughed at. The door opens to the Living Room.
+   *"mmdd to get out bday boy"* (sets `saw_note`). The PC's `diary.txt` also
+   hints at it. Click anywhere (or Esc) to put the poster back.
+4. **Hand** the **Keypad Door** and enter **0929** (the birthday, month then
+   day). Wrong codes get laughed at. The door opens to the Living Room.
 5. Optional but load-bearing later:
    - **Mini-Fridge** → **Cold Cheese Slice** (one per game).
    - **PC** → the *Winders XD* desktop: `diary.txt`, `me.bmp`, `sun.bmp`
-     (its eyes are open in this one), `hold_music.wav`, `voicemail_3.wav`
-     (*"Don't go in the basement."*), the Recycle Bin, and `DO NOT OPEN.exe`
+     (its eyes open after it loads — click it then and it will talk to you),
+     `hold_music.wav` and `voicemail_3.wav` (both silence the room music
+     while they play; *"Don't go in the basement."*), the Recycle Bin, and `DO NOT OPEN.exe`
      — dismiss the error three times to reveal `basement_key.png` ("not
      yet.", sets `pc_curiosity`).
    - **Pizza Rolls** → the microwave rhythm game: click when the pink ring
-     lands on the gold one. The beat is **600 ms**; a hit is **±100 ms**
-     (±40 ms is PERFECT). **10 hits in a row** wins the
+     lands on the gold one. The beat is **600 ms**; a hit is **±150 ms**
+     (±60 ms is PERFECT). Off-beat clicks only reset your streak — the box
+     swells only for beats you ignore entirely. **10 hits in a row** wins the
      **Perfect Pizza Roll** (`pizza_win`). **3 misses** and the box
      detonates (`pizza_exploded`, permanent carpet stain, box respawns).
      You need the roll for the kitchen cabinet — win eventually.
@@ -133,7 +135,7 @@ birthday card dated **today** — and Dorko takes the shades off. We never see
 his eyes. The afro stays. It was never the problem.
 
 **Credits:** the pulse ticks at 600 ms and the credits are clickable — land
-**10 on-beat clicks** (±100 ms) before they end and stay for the post-credits
+**10 on-beat clicks** (±150 ms) before they end and stay for the post-credits
 line. Esc skips (and forfeits it).
 
 ---
@@ -145,7 +147,7 @@ line. Esc skips (and forfeits it).
 | `intro_done` | Orange Room wake-up beat finished |
 | `saw_note` | Peeled the sun poster |
 | `orange_card_taken` / `orange_fridge_taken` | One-shot pickups, Room 1 |
-| `room1_door_open` | Keypad solved (4170) |
+| `room1_door_open` | Keypad solved (0929) |
 | `pc_curiosity` | Found `basement_key.png` on the PC |
 | `pizza_win` / `pizza_exploded` | Pizza roll minigame outcome |
 | `knows_sandwich` | Couch Guy asked for a sandwich |

@@ -18,7 +18,7 @@
     },
     "n4": {
       "speaker": "The Turquoise One",
-      "text": "Your housemates. Lessons, all of them. The man on the couch chose to watch. The bomb chose to almost. The computer chose to remember. Lovely, stationary lessons. You walked past every one of them and learned— hm. We'll see what you learned.",
+      "text": "Your housemates. Lessons, all of them. The man on the couch chose to watch. The bomb chose to almost. The computer chose to remember. Lovely, stationary lessons. You walked past every one of them and learned- hm. We'll see what you learned.",
       "next": "n5"
     },
     "n5": {
@@ -38,7 +38,7 @@
     },
     "n8": {
       "speaker": "The Turquoise One",
-      "text": "But first — and I need you to understand this is the most important thing I will say tonight — the pizza rolls.",
+      "text": "But first - and I need you to understand this is the most important thing I will say tonight - the pizza rolls.",
       "next": "n9"
     },
     "n9": {
@@ -53,7 +53,7 @@
     },
     "n11": {
       "speaker": "The Turquoise One",
-      "text": "But you made a perfect one anyway. Inside their sloppy little window. I felt it from down here — the house got warmer by an amount I chose not to measure, and I was proud of you, and I hated that, and I filed the hate under the shell with everything else.",
+      "text": "But you made a perfect one anyway. Inside their sloppy little window. I felt it from down here - the house got warmer by an amount I chose not to measure, and I was proud of you, and I hated that, and I filed the hate under the shell with everything else.",
       "next": "n12"
     },
     "n12": {

@@ -1,6 +1,6 @@
 extends BaseRoom
 ## The Kitchen (spec 7.3). Pale green tile, a checkerboard floor doing its
-## best pseudo-3D, a fridge with editorial magnets, and — through the window —
+## best pseudo-3D, a fridge with editorial magnets, and - through the window -
 ## an actual night. The only real weather in the house.
 
 var _fridge_sprite: Sprite2D
@@ -65,11 +65,9 @@ func _build_walls() -> void:
 func _build_fridge() -> void:
 	_fridge_sprite = add_prop(AssetLib.get_or_build("kitchen_fridge", _build_fridge_tex), Vector2(148, 168))
 	_magnet_sprite = Sprite2D.new()
-	var ate := GameState.get_flag("fridge_opened")
-	# The magnets spelled EAT when this door first opened. Some visit later,
-	# they spell ATE. Nobody moved them. That's the joke and also the threat.
-	_magnet_sprite.texture = AssetLib.get_or_build("kitchen_magnets_ate" if ate else "kitchen_magnets_eat",
-		func(): return _build_magnets_tex(ate))
+	# The magnets spell EAT until the food is actually gone; the moment the
+	# last of it leaves the fridge, they spell ATE. Nobody moved them.
+	_magnet_sprite.texture = _magnets_tex(_fridge_emptied())
 	_magnet_sprite.position = Vector2(148, 150)
 	_magnet_sprite.z_index = _fridge_sprite.z_index + 1
 	props.add_child(_magnet_sprite)
@@ -143,8 +141,18 @@ func _build_cabinet() -> void:
 
 # ---------------------------------------------------------------- fridge
 
+func _fridge_emptied() -> bool:
+	return GameState.get_flag("kitchen_meat_taken") and GameState.get_flag("kitchen_lettuce_taken")
+
+
+func _magnets_tex(ate: bool) -> Texture2D:
+	if ate:
+		return AssetLib.get_or_build("kitchen_magnets_ate", func(): return _build_magnets_tex(true))
+	return AssetLib.get_or_build("kitchen_magnets_eat", func(): return _build_magnets_tex(false))
+
+
 func _look_fridge() -> void:
-	if GameState.get_flag("fridge_opened"):
+	if _fridge_emptied():
 		say("The magnets say ATE now. I didn't move them. I want that on the record.")
 	else:
 		say("The magnets spell EAT. Direct. I respect a fridge with a thesis.")
@@ -164,6 +172,9 @@ func _touch_fridge() -> void:
 		GameState.set_flag("kitchen_lettuce_taken")
 		gave = true
 	if gave:
+		if _fridge_emptied():
+			# the fridge updates its editorial position immediately
+			_magnet_sprite.texture = _magnets_tex(true)
 		var line := "\"Meat\", in quotes, and lettuce. The lettuce vouches for nothing."
 		if Inventory.has_item("cold_cheese_slice"):
 			line += " The cheese from the other fridge glares at them. Cheese counts, cheese. You count."
@@ -188,6 +199,10 @@ func _touch_breadbox() -> void:
 		say("Two slices. They travel as one item. They've agreed to this.")
 
 
+## Sync entry point: handlers reached via Callable.call() must never be
+## coroutines (Godot errors out on "async function without await" and the
+## body never runs - this was the reported toaster freeze). The wrapper
+## validates synchronously, then fires the async cycle as a direct call.
 func _use_on_toaster(item_id: String) -> bool:
 	if item_id != "bread":
 		if item_id == "toast":
@@ -197,6 +212,11 @@ func _use_on_toaster(item_id: String) -> bool:
 	if _toasting:
 		say("It's busy. Toast is a process, not an event.")
 		return true
+	_toast_cycle()
+	return true
+
+
+func _toast_cycle() -> void:
 	_toasting = true
 	# Consume the bread only when the toast pops: if the player wanders off to
 	# another room mid-cycle this timer dies with the room and the bread lives.
@@ -210,24 +230,24 @@ func _use_on_toaster(item_id: String) -> bool:
 	tick.start()
 	await timer.timeout
 	if not is_instance_valid(tick):
-		return true
+		return
 	tick.queue_free()
 	if not is_inside_tree():
-		return true
+		return
 	_toasting = false
 	_toaster_sprite.modulate = Color.WHITE
-	# The bread might have been combined away during the 3s cycle — no bread,
+	# The bread might have been combined away during the 3s cycle - no bread,
 	# no toast, no duplication exploit.
 	if not Inventory.has_item("bread"):
 		AudioBus.play_sfx("pop", 0.7)
 		say("The toaster popped on nothing. It felt that. We both felt that.")
-		return true
+		return
 	Inventory.remove_item("bread")
 	Inventory.add_item("toast")
 	UILayer.fly_item("toast", Vector2(268, 160))
 	AudioBus.play_sfx("pop", 1.3)
 	say("Toast. The bread came back with a past.")
-	return true
+	return
 
 
 func _use_on_board(item_id: String) -> bool:
@@ -239,17 +259,22 @@ func _use_on_board(item_id: String) -> bool:
 			say("It doesn't need cutting. It needs assembling. Different verb, same me.")
 			return true
 		return false
-	# chop chop chop
+	_chop_meat()  # async body fired via direct call (never through Callable.call)
+	return true
+
+
+func _chop_meat() -> void:
 	GameState.lock_input()
 	for i in 3:
 		AudioBus.play_sfx("thud_tile_1", 1.8, -4.0)
 		await get_tree().create_timer(0.22).timeout
 	GameState.unlock_input()
+	if not is_inside_tree():
+		return
 	Inventory.remove_item("mystery_meat")
 	Inventory.add_item("sliced_meat")
 	UILayer.fly_item("sliced_meat", Vector2(430, 164))
 	say("Sliced. The quotes survived the knife.")
-	return true
 
 
 # ---------------------------------------------------------------- cabinet
@@ -289,16 +314,20 @@ func _use_on_cabinet(item_id: String) -> bool:
 	if GameState.get_flag("cabinet_open"):
 		say("Already open. The roll and I both remember.")
 		return true
+	_melt_latch()  # async body fired via direct call
+	return true
+
+
+func _melt_latch() -> void:
 	# The roll's impossible heat vs. childproof plastic. One-sided.
 	AudioBus.play_sfx("puff")
 	await get_tree().create_timer(0.5).timeout
 	if not is_inside_tree():
-		return true
+		return
 	AudioBus.play_sfx("poof", 0.8)
 	GameState.set_flag("cabinet_open")
 	_cabinet_sprite.texture = _cabinet_tex()
 	say("The latch melted. The roll is unharmed. Still perfect. Of course it is.")
-	return true
 
 
 func _cabinet_tex() -> Texture2D:

@@ -1,7 +1,7 @@
 extends Control
 ## Blue Bomb's chest panel (spec 7.4, step 3). Five wires; the VHS shelf's
 ## labels give the order: RED first, then "the one that isn't there" (there is
-## no orange wire — you skip straight on), YELLOW, BLUE last. GREEN is a
+## no orange wire - you skip straight on), YELLOW, BLUE last. GREEN is a
 ## decoy: cutting it triggers a five-second fake countdown that ends in a
 ## party horn. Any other wrong cut gets a sad bwomp and a reset.
 ##

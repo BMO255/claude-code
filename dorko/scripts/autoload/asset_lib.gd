@@ -1,6 +1,6 @@
 extends Node
 ## Procedural asset factory + cache. Every texture and sound in DORKO is
-## generated at runtime from code — there are no binary assets in the repo.
+## generated at runtime from code - there are no binary assets in the repo.
 ## Rooms build their own art with painter()/get_or_build(); shared art
 ## (cursors, item icons, portraits, floors, SFX, music) lives here.
 
@@ -48,8 +48,8 @@ func _build_tex(name: String) -> Texture2D:
 			p.dot(5, 5, Color(1, 1, 1))
 		"cursor_hand":
 			p = painter(12, 12, 2)
-			var skin := Color(0.4, 0.75, 0.35)
-			var dark := Color(0.12, 0.3, 0.12)
+			var skin := Color(0.96, 0.82, 0.3)
+			var dark := Color(0.55, 0.42, 0.08)
 			p.rect(3, 5, 6, 6, skin)          # palm
 			p.rect(3, 2, 1, 4, skin)           # fingers
 			p.rect(5, 1, 1, 5, skin)
@@ -204,7 +204,7 @@ func _build_portrait(id: String) -> Texture2D:
 		"dorko":
 			var fro := Color(0.16, 0.5, 0.2)
 			var fro_dark := Color(0.08, 0.3, 0.1)
-			var skin := Color(0.45, 0.75, 0.35)
+			var skin := Color(0.96, 0.82, 0.3)
 			# afro: cluster of circles
 			p.circle(12, 8, 8, fro_dark)
 			p.circle(7, 8, 4.5, fro); p.circle(17, 8, 4.5, fro)
@@ -217,7 +217,7 @@ func _build_portrait(id: String) -> Texture2D:
 			p.line(5, 15, 12, 20, Color(0.6, 0.25, 0.0))
 			p.line(19, 15, 12, 20, Color(0.6, 0.25, 0.0))
 			p.dot(9, 16, Color(1.0, 0.8, 0.5))  # glint
-			p.hline(10, 22, 4, Color(0.1, 0.25, 0.08))  # deadpan mouth
+			p.hline(10, 22, 4, Color(0.5, 0.36, 0.06))  # deadpan mouth
 		"couch_guy":
 			var face := Color(0.9, 0.75, 0.6)
 			var hat := Color(0.55, 0.55, 0.58)
@@ -225,6 +225,11 @@ func _build_portrait(id: String) -> Texture2D:
 			p.ellipse(12, 7, 10, 5, hat)                 # ushanka dome
 			p.rect(2, 8, 4, 10, hat); p.rect(18, 8, 4, 10, hat)  # ear flaps down
 			p.speckle(3, 3, 18, 6, Color(0.68, 0.68, 0.7), 0.25, 3)
+			# the red star on the front of the hat
+			var star := Color(0.85, 0.15, 0.12)
+			p.dot(12, 6, star)
+			p.dot(11, 7, star); p.dot(12, 7, star); p.dot(13, 7, star)
+			p.dot(10, 8, star); p.dot(14, 8, star)
 			p.hline(8, 13, 3, Color(0.2, 0.15, 0.1))     # half-lidded eyes, locked right
 			p.hline(14, 13, 3, Color(0.2, 0.15, 0.1))
 			p.dot(10, 14, Color(0.1, 0.08, 0.05)); p.dot(16, 14, Color(0.1, 0.08, 0.05))
@@ -238,6 +243,23 @@ func _build_portrait(id: String) -> Texture2D:
 			p.dot(12, 1, Color(1, 0.8, 0.2)); p.dot(11, 0, Color(1, 0.4, 0.1))
 			p.ellipse(12, 19, 3, 1.5, Color(0.1, 0.13, 0.3))  # worried mouth
 			p.dot(19, 10, Color(0.6, 0.8, 1.0))          # sweat
+		"sun_bmp":
+			# the sun from the file, eyes open, all teeth accounted for
+			p.rect(1, 1, 22, 22, Color(0.5, 0.72, 0.95))
+			p.circle(12, 12, 8, Color(1.0, 0.84, 0.12))
+			p.ellipse_outline(12, 12, 8, 8, Color(0.85, 0.6, 0.05))
+			for i in 8:
+				var a := TAU * float(i) / 8.0
+				p.line(int(12 + cos(a) * 9.0), int(12 + sin(a) * 9.0),
+					int(12 + cos(a) * 11.5), int(12 + sin(a) * 11.5), Color(1.0, 0.84, 0.12))
+			p.circle(9, 10, 1.6, Color.WHITE)
+			p.circle(15, 10, 1.6, Color.WHITE)
+			p.dot(9, 10, Color(0.15, 0.1, 0.05))
+			p.dot(15, 10, Color(0.15, 0.1, 0.05))
+			p.ellipse(12, 15, 5, 2.5, Color(0.4, 0.15, 0.05))
+			for i in 5:
+				p.dot(8 + i * 2, 14, Color(0.98, 0.98, 0.95))
+				p.dot(8 + i * 2, 16, Color(0.98, 0.98, 0.95))
 		"turquoise_one":
 			var tq := Color(0.2, 0.8, 0.75)
 			p.ellipse(12, 12, 6, 10, tq)

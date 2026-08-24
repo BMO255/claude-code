@@ -263,28 +263,14 @@ func _read_tapes() -> void:
 	])
 
 
+## Handlers wired through Hotspot Callables must be sync (Callable.call on a
+## coroutine is an engine error and the body never runs); each fires its
+## async sequence as a direct method call instead.
 func _touch_boombox() -> void:
 	if _busy:
 		return
 	if not GameState.get_flag("basement_boombox_played"):
-		_busy = true
-		AudioBus.play_sfx("click", 0.9)
-		# ~4s of a child's tape: squeaky babble saying dorko dorko dorko, then laughter
-		var voice := SfxSynth.seq([
-			SfxSynth.tone(520.0, 0.16, "square", 0.14, 0.01, 0.05), SfxSynth.tone(660.0, 0.13, "square", 0.13, 0.01, 0.05), SfxSynth.silence(0.14),
-			SfxSynth.tone(540.0, 0.16, "square", 0.14, 0.01, 0.05), SfxSynth.tone(680.0, 0.13, "square", 0.13, 0.01, 0.05), SfxSynth.silence(0.14),
-			SfxSynth.tone(500.0, 0.16, "square", 0.14, 0.01, 0.05), SfxSynth.tone(640.0, 0.15, "square", 0.13, 0.01, 0.06), SfxSynth.silence(0.3),
-			SfxSynth.sweep(700.0, 1000.0, 0.22, "sine", 0.12, 0.01, 0.05), SfxSynth.silence(0.08),
-			SfxSynth.sweep(750.0, 1050.0, 0.2, "sine", 0.12, 0.01, 0.05), SfxSynth.silence(0.08),
-			SfxSynth.sweep(800.0, 1150.0, 0.3, "sine", 0.12, 0.01, 0.1),
-		])
-		AudioBus.play_stream(SfxSynth.to_wav(SfxSynth.mix([voice, SfxSynth.noise(4.0, 0.02, 0.2, 0.2, 0.4, 88)])), 1.6, -4.0)
-		await get_tree().create_timer(4.2).timeout
-		if not is_inside_tree():
-			return
-		GameState.set_flag("basement_boombox_played")
-		_busy = false
-		say("A kid's voice. Saying my name. Then laughing. I'm going to think about the lava lamp instead.")
+		_play_boombox_tape()
 	elif not GameState.get_flag("basement_tape_taken"):
 		if Inventory.add_item("cassette_tape"):
 			UILayer.fly_item("cassette_tape", Vector2(310, 236))
@@ -295,9 +281,34 @@ func _touch_boombox() -> void:
 		say("It plays static now, out of principle.")
 
 
+func _play_boombox_tape() -> void:
+	_busy = true
+	AudioBus.play_sfx("click", 0.9)
+	# ~4s of a child's tape: squeaky babble saying dorko dorko dorko, then laughter
+	var voice := SfxSynth.seq([
+		SfxSynth.tone(520.0, 0.16, "square", 0.14, 0.01, 0.05), SfxSynth.tone(660.0, 0.13, "square", 0.13, 0.01, 0.05), SfxSynth.silence(0.14),
+		SfxSynth.tone(540.0, 0.16, "square", 0.14, 0.01, 0.05), SfxSynth.tone(680.0, 0.13, "square", 0.13, 0.01, 0.05), SfxSynth.silence(0.14),
+		SfxSynth.tone(500.0, 0.16, "square", 0.14, 0.01, 0.05), SfxSynth.tone(640.0, 0.15, "square", 0.13, 0.01, 0.06), SfxSynth.silence(0.3),
+		SfxSynth.sweep(700.0, 1000.0, 0.22, "sine", 0.12, 0.01, 0.05), SfxSynth.silence(0.08),
+		SfxSynth.sweep(750.0, 1050.0, 0.2, "sine", 0.12, 0.01, 0.05), SfxSynth.silence(0.08),
+		SfxSynth.sweep(800.0, 1150.0, 0.3, "sine", 0.12, 0.01, 0.1),
+	])
+	AudioBus.play_stream(SfxSynth.to_wav(SfxSynth.mix([voice, SfxSynth.noise(4.0, 0.02, 0.2, 0.2, 0.4, 88)])), 1.6, -4.0)
+	await get_tree().create_timer(4.2).timeout
+	if not is_inside_tree():
+		return
+	GameState.set_flag("basement_boombox_played")
+	_busy = false
+	say("A kid's voice. Saying my name. Then laughing. I'm going to think about the lava lamp instead.")
+
+
 func _touch_phone() -> void:
 	if _busy:
 		return
+	_phone_call()
+
+
+func _phone_call() -> void:
 	_busy = true
 	AudioBus.play_sfx("click", 1.1)
 	# dial tone that slowly admits it's the hold music
@@ -311,7 +322,7 @@ func _touch_phone() -> void:
 		return
 	if tone_player and is_instance_valid(tone_player):
 		tone_player.stop()
-	# NOTE: the hold track is loop-enabled — it MUST be tracked in
+	# NOTE: the hold track is loop-enabled - it MUST be tracked in
 	# _phone_players so _exit_tree can stop it if the player walks out mid-call.
 	var hold := AudioBus.play_stream(AssetLib.music("hold"), 1.0, -10.0)
 	_phone_players.append(hold)
@@ -328,6 +339,10 @@ func _touch_phone() -> void:
 func _ride_bike() -> void:
 	if _busy:
 		return
+	_bike_session()
+
+
+func _bike_session() -> void:
 	_busy = true
 	GameState.lock_input()
 	# three seconds of honest cardio
@@ -421,7 +436,7 @@ func _use_on_heater(item_id: String) -> bool:
 		UILayer.fly_item("wet_rag", Vector2(452, 200))
 		say("Pried it open. The trophy bent. Still says PARTICIPANT. Truer than ever. And inside: one professionally damp rag.")
 	else:
-		say("Pried it open. There's a damp rag in there — it can wait until my pockets can.")
+		say("Pried it open. There's a damp rag in there - it can wait until my pockets can.")
 	return true
 
 
@@ -470,11 +485,11 @@ func _use_on_bomb(item_id: String) -> bool:
 			GameState.set_flag("key_jammed")
 			AudioBus.play_sfx("clink", 0.8)
 			_bomb.refresh()
-			DialogueManager.say("Blue Bomb", "Oh. Oh that's— I feel lighter. Is this what lighter feels like.")
+			DialogueManager.say("Blue Bomb", "Oh. Oh that's- I feel lighter. Is this what lighter feels like.")
 			return true
 		"ramune_bottle", "wet_rag":
 			if not GameState.get_flag("key_jammed"):
-				DialogueManager.say("Blue Bomb", "N-not yet— the key would just wind me dry again— the key first, sorry, I have a whole order—")
+				DialogueManager.say("Blue Bomb", "N-not yet- the key would just wind me dry again- the key first, sorry, I have a whole order-")
 				return true
 			if GameState.get_flag("fuse_wet"):
 				say("The fuse is out of the fire business. It's damp and it's done.")
@@ -485,9 +500,9 @@ func _use_on_bomb(item_id: String) -> bool:
 			AudioBus.play_sfx("static_burst", 1.8, -14.0)
 			_bomb.refresh()
 			if item_id == "ramune_bottle":
-				DialogueManager.say("Blue Bomb", "Fizzy. It's fizzy on my— thank you. The bubbles are doing the work. Tell the marble it did great.")
+				DialogueManager.say("Blue Bomb", "Fizzy. It's fizzy on my- thank you. The bubbles are doing the work. Tell the marble it did great.")
 			else:
-				DialogueManager.say("Blue Bomb", "Cold— wet— perfect— that rag has been in that heater since before some of my fears existed.")
+				DialogueManager.say("Blue Bomb", "Cold- wet- perfect- that rag has been in that heater since before some of my fears existed.")
 			return true
 		"perfect_pizza_roll":
 			say("Heat, meet bomb. No. This is the worst idea I've had all house.")
@@ -498,7 +513,12 @@ func _use_on_bomb(item_id: String) -> bool:
 	return false
 
 
+## Sync callback for the wire panel's on_success Callable.
 func _on_defused() -> void:
+	_defused_cutscene()
+
+
+func _defused_cutscene() -> void:
 	GameState.set_flag("bomb_defused")
 	_bomb.refresh()
 	AudioBus.play_sfx("puff", 0.9)
@@ -516,14 +536,14 @@ func _on_defused() -> void:
 	DialogueManager.say_seq([
 		["Blue Bomb", "I don't know what I'm supposed to do now. I was the bomb. Now I'm... a ball?"],
 		["Dorko", "Welcome to the club."],
-		["Blue Bomb", "Is there a jacket. Does the club have a— sorry. Take this. It's yours. It was never really mine, it was just IN me—"],
+		["Blue Bomb", "Is there a jacket. Does the club have a- sorry. Take this. It's yours. It was never really mine, it was just IN me-"],
 	])
 	await DialogueManager.dialogue_finished
 	if not is_inside_tree():
 		return
 	if Inventory.add_item("wind_up_key"):
 		UILayer.fly_item("wind_up_key", _bomb.global_position + Vector2(0, -40))
-	DialogueManager.say("Blue Bomb", "There's a room behind the arcade machine. I could hear it humming. Don't— actually, go. I'm not the boss of you. I'm not the boss of anything.")
+	DialogueManager.say("Blue Bomb", "There's a room behind the arcade machine. I could hear it humming. Don't- actually, go. I'm not the boss of you. I'm not the boss of anything.")
 
 
 # ---------------------------------------------------------------- arcade
@@ -558,11 +578,16 @@ func _use_on_arcade(item_id: String) -> bool:
 	if not GameState.get_flag("bomb_defused"):
 		say("Not while he's ticking adjacent. Priorities.")
 		return true
+	_slide_arcade()  # async body fired via direct call
+	return true
+
+
+func _slide_arcade() -> void:
 	AudioBus.play_sfx("door_unlock")
 	GameState.lock_input()
 	await get_tree().create_timer(0.4).timeout
 	if not is_inside_tree():
-		return true
+		return
 	AudioBus.play_sfx("swoosh", 0.8)
 	var tw := create_tween()
 	tw.tween_property(_arcade_sprite, "position:x", 508.0, 1.1).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN_OUT)
@@ -572,7 +597,6 @@ func _use_on_arcade(item_id: String) -> bool:
 	_reveal_crawlspace(false)
 	GameState.unlock_input()
 	say("The key fit the coin door. The coin door freed the slider. The cabinet slid. Behind it: a crawlspace, and light with a temperature I don't have a word for.")
-	return true
 
 
 func _reveal_crawlspace(silent: bool) -> void:

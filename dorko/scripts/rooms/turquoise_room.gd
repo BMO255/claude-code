@@ -44,7 +44,7 @@ func _room_setup() -> void:
 		"name": "The Turquoise One",
 		"pos": Vector2(320, 150),
 		"size": Vector2(60, 130),
-		"look": "Tall. Smooth. Wearing my shades. Mine are mine. I checked — mine are still on my face. So whose are those.",
+		"look": "Tall. Smooth. Wearing my shades. Mine are mine. I checked - mine are still on my face. So whose are those.",
 		"touch": func(): say("My hand said no before I did."),
 		"on_talk": func(): say("It talks when it's ready. It's been getting ready for a long time."),
 		"walk_required": false,
@@ -54,7 +54,7 @@ func _room_setup() -> void:
 func _on_room_entered() -> void:
 	if GameState.get_flag("battle_won"):
 		# A save landed here after the fight: the figure is gone, and the room
-		# has no exits — carry the player forward into the conclusion.
+		# has no exits - carry the player forward into the conclusion.
 		_figure.visible = false
 		await get_tree().create_timer(1.2).timeout
 		if is_inside_tree():
@@ -63,7 +63,7 @@ func _on_room_entered() -> void:
 	await get_tree().create_timer(1.5).timeout
 	if not is_inside_tree():
 		return
-	# If the player got a look-line open in the first moment, wait it out —
+	# If the player got a look-line open in the first moment, wait it out -
 	# giving up here would strand them in a room with no exits.
 	while DialogueManager.active:
 		await get_tree().create_timer(0.5).timeout

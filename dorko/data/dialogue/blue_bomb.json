@@ -3,7 +3,7 @@
   "nodes": {
     "start": {
       "speaker": "Blue Bomb",
-      "text": "Oh— hi— don't come too close— or do, it's fine, it's been like this since '94.",
+      "text": "Oh- hi- don't come too close- or do, it's fine, it's been like this since '94.",
       "choices": [
         { "text": "What's been like this?", "next": "situation" },
         { "text": "Are you... a bomb?", "next": "a_bomb", "once": true },
@@ -13,12 +13,12 @@
     },
     "a_bomb": {
       "speaker": "Blue Bomb",
-      "text": "I was. I am? I'm— it's more of a title now. Like 'duke'.",
+      "text": "I was. I am? I'm- it's more of a title now. Like 'duke'.",
       "next": "situation"
     },
     "situation": {
       "speaker": "Blue Bomb",
-      "text": "The fuse is going. It's been going. Thirty years. It's not a fast fuse. It's a— it's a lifestyle, someone said. That was hurtful. Accurate. Hurtful.",
+      "text": "The fuse is going. It's been going. Thirty years. It's not a fast fuse. It's a- it's a lifestyle, someone said. That was hurtful. Accurate. Hurtful.",
       "choices": [
         { "text": "Want me to defuse you?", "next": "help" },
         { "text": "Thirty years is a long time.", "next": "long_time", "once": true },
@@ -27,17 +27,17 @@
     },
     "long_time": {
       "speaker": "Blue Bomb",
-      "text": "I've seen every one of that shelf's tapes from here. From the floor. The labels, I mean. I know them by— sorry, I'm talking a lot, the fuse makes me chatty—",
+      "text": "I've seen every one of that shelf's tapes from here. From the floor. The labels, I mean. I know them by- sorry, I'm talking a lot, the fuse makes me chatty-",
       "next": "situation"
     },
     "help": {
       "speaker": "Blue Bomb",
-      "text": "You'd— really? Okay. Okay okay okay. Three things. Sorry. It's three things.",
+      "text": "You'd- really? Okay. Okay okay okay. Three things. Sorry. It's three things.",
       "next": "help_key"
     },
     "help_key": {
       "speaker": "Blue Bomb",
-      "text": "One: the key. In my back. It keeps winding me. Something has to jam it. Something chewy— tape-y— I don't know, I've never seen my own back.",
+      "text": "One: the key. In my back. It keeps winding me. Something has to jam it. Something chewy- tape-y- I don't know, I've never seen my own back.",
       "next": "help_fuse"
     },
     "help_fuse": {
@@ -62,13 +62,13 @@
     },
     "bye": {
       "speaker": "Blue Bomb",
-      "text": "Thank you for— yes. Bye. I'll be here. That's not a threat. Sorry. Bye.",
+      "text": "Thank you for- yes. Bye. I'll be here. That's not a threat. Sorry. Bye.",
       "next": null
     },
 
     "jammed_start": {
       "speaker": "Blue Bomb",
-      "text": "The key stopped. I feel— lighter? Is this what lighter feels like. Two more things. Sorry. The fuse, then the wires.",
+      "text": "The key stopped. I feel- lighter? Is this what lighter feels like. Two more things. Sorry. The fuse, then the wires.",
       "choices": [
         { "text": "Remind me about the fuse.", "next": "help_fuse_short" },
         { "text": "Hang in there.", "next": "bye" }
@@ -76,13 +76,13 @@
     },
     "help_fuse_short": {
       "speaker": "Blue Bomb",
-      "text": "Wet. It needs to be wet. There's water in the heater behind me, if you can get the panel off, or— anything fizzy works. Historically. Don't ask about historically.",
+      "text": "Wet. It needs to be wet. There's water in the heater behind me, if you can get the panel off, or- anything fizzy works. Historically. Don't ask about historically.",
       "next": null
     },
 
     "wet_start": {
       "speaker": "Blue Bomb",
-      "text": "It's out— mostly out— it's smoldering politely. Just the wires now. They're in my chest. I'd look away but it's my chest.",
+      "text": "It's out- mostly out- it's smoldering politely. Just the wires now. They're in my chest. I'd look away but it's my chest.",
       "choices": [
         { "text": "Let's do the wires.", "next": "wires_go" },
         { "text": "What was the order again?", "next": "wires_order" },
@@ -91,12 +91,12 @@
     },
     "wires_go": {
       "speaker": "Blue Bomb",
-      "text": "Okay. Okay okay. Touch my— just, hands on the chest panel. I'll think about the ocean.",
+      "text": "Okay. Okay okay. Touch my- just, hands on the chest panel. I'll think about the ocean.",
       "next": null
     },
     "wires_order": {
       "speaker": "Blue Bomb",
-      "text": "The shelf. The tape labels. They've been staring at me for thirty years — the least they can do is be instructions.",
+      "text": "The shelf. The tape labels. They've been staring at me for thirty years - the least they can do is be instructions.",
       "next": null
     },
 
@@ -120,12 +120,12 @@
     },
     "hidden": {
       "speaker": "Blue Bomb",
-      "text": "Behind the cabinet. Turquoise light under it. The coin door's lock takes something key-shaped— oh. OH. The key. My key. Take my key. It's the best thing I've ever said out loud.",
+      "text": "Behind the cabinet. Turquoise light under it. The coin door's lock takes something key-shaped- oh. OH. The key. My key. Take my key. It's the best thing I've ever said out loud.",
       "next": null
     },
     "defused_bye": {
       "speaker": "Blue Bomb",
-      "text": "You too. You— sorry. You first. Bye.",
+      "text": "You too. You- sorry. You first. Bye.",
       "next": null
     }
   }

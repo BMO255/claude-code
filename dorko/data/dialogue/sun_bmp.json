@@ -1,0 +1,58 @@
+{
+  "id": "sun_bmp",
+  "nodes": {
+    "start": {
+      "speaker": "sun.bmp",
+      "text": "GOOD MORNING. it is always morning in here. i checked.",
+      "choices": [
+        { "text": "Are you the poster sun?", "next": "poster" },
+        { "text": "Why are your eyes open?", "next": "eyes" },
+        { "text": "What are you a picture of?", "next": "picture", "once": true },
+        { "text": "Goodbye, sun.", "next": "bye" }
+      ]
+    },
+    "poster": {
+      "speaker": "sun.bmp",
+      "text": "the poster is my headshot. this is the candid. the poster smiles for the room. i smile for the file system.",
+      "next": "poster2"
+    },
+    "poster2": {
+      "speaker": "Dorko",
+      "text": "Both of you have too many teeth.",
+      "next": "poster3"
+    },
+    "poster3": {
+      "speaker": "sun.bmp",
+      "text": "thank you.",
+      "next": null
+    },
+    "eyes": {
+      "speaker": "sun.bmp",
+      "text": "they were always open. the other picture just loads slower. everything in this house loads slower than its eyes.",
+      "choices": [
+        { "text": "That's not comforting.", "next": "eyes2" },
+        { "text": "Fair enough.", "next": null }
+      ]
+    },
+    "eyes2": {
+      "speaker": "sun.bmp",
+      "text": "comfort is the screensaver. it comes on when nobody moves for a while. nobody has moved here in a long time. except you. keep moving, dorko.",
+      "next": null
+    },
+    "picture": {
+      "speaker": "sun.bmp",
+      "text": "a day outside. taken from inside. it is the best kind of day. nobody can end it.",
+      "next": "picture2"
+    },
+    "picture2": {
+      "speaker": "Dorko",
+      "text": "It's 12 kilobytes of weather and it still sounds happier than me.",
+      "next": null
+    },
+    "bye": {
+      "speaker": "sun.bmp",
+      "text": "GOOD MORNING. that is also how i say goodbye. i only have the one file.",
+      "next": null
+    }
+  }
+}

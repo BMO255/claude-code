@@ -1,5 +1,5 @@
 extends Control
-## "Winders XD" — the family computer (spec 7.1a). A full-screen fake-OS
+## "Winders XD" - the family computer (spec 7.1a). A full-screen fake-OS
 ## overlay pushed by the orange room via SceneRouter.push_overlay(); Esc (or
 ## Go > Shut Down) pops it. Everything on the desk is procedural: wallpaper,
 ## icons, chunky bevel windows, the hold music, and one voicemail that
@@ -8,7 +8,7 @@ extends Control
 ## Self-contained: references only autoloads + core classes. All texture keys
 ## are prefixed "pcdesk_".
 
-const VM_TEXT := "Dorko. It's— listen. Don't go in the basement. I'm serious this time."
+const VM_TEXT := "Dorko. It's- listen. Don't go in the basement. I'm serious this time."
 const ERROR_TEXT := "This program has performed an illegal operation and will be escorted out."
 const ERROR_TITLES := ["Error", "Error (again)", "Error (final)"]
 const DIARY_TEXT := """aug 3
@@ -69,7 +69,7 @@ var _hold_time: Label = null
 var _vm_player: AudioStreamPlayer = null
 var _vm_label: Label = null
 # static: synthesized once per app session, not once per overlay visit
-# (the voicemail is ~10s of samples — regenerating it every PC boot hitches)
+# (the voicemail is ~10s of samples - regenerating it every PC boot hitches)
 static var _vm_stream: AudioStreamWAV = null
 static var _shutdown_wav: AudioStreamWAV = null
 
@@ -95,10 +95,12 @@ func _ready() -> void:
 
 func _exit_tree() -> void:
 	# The desk can be popped mid-song (room transition force-pops overlays);
-	# don't leave the hold music haunting the SFX bus.
+	# don't leave the hold music haunting the SFX bus, and give the room its
+	# music back if we silenced it.
 	for p in [_hold_player, _vm_player]:
 		if p != null and is_instance_valid(p):
 			p.stop()
+	AudioBus.resume_ducked()
 
 
 func _process(delta: float) -> void:
@@ -122,7 +124,8 @@ func _process(delta: float) -> void:
 
 func _unhandled_input(event: InputEvent) -> void:
 	# Overlays own their Esc (UILayer deliberately ignores it while we're up).
-	if event.is_action_pressed("pause"):
+	# Not while a dialogue (the sun, say) is holding court, though.
+	if event.is_action_pressed("pause") and not DialogueManager.active:
 		accept_event()
 		_shutdown()
 
@@ -312,11 +315,15 @@ func _on_app_closed(id: String) -> void:
 			_hold_btn = null
 			_hold_cursor = null
 			_hold_time = null
+			if not _open_windows.has("voicemail"):
+				AudioBus.resume_ducked()
 		"voicemail":
 			if _vm_player != null and is_instance_valid(_vm_player):
 				_vm_player.stop()
 			_vm_player = null
 			_vm_label = null
+			if not _open_windows.has("hold"):
+				AudioBus.resume_ducked()
 	_open_windows.erase(id)
 
 
@@ -385,12 +392,24 @@ func _open_sun() -> void:
 	img.position = Vector2(10, 8)
 	img.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	w.content.add_child(img)
-	w.content.add_child(_make_label("sun.bmp  120 x 96  16 colors", Vector2(10, 106), Vector2(126, 12), 7, Color(0.4, 0.4, 0.42)))
+	var caption := _make_label("sun.bmp  120 x 96  16 colors", Vector2(10, 106), Vector2(126, 12), 7, Color(0.4, 0.4, 0.42))
+	w.content.add_child(caption)
 	_register_window("sun", w)
-	# 1.4s after the file "loads", the eyes finish loading too.
+	# 1.4s after the file "loads", the eyes finish loading too. From then on
+	# the image takes clicks: you can talk to it. It was always going to talk.
+	var awake := [false]
+	img.gui_input.connect(func(event):
+		if awake[0] and event is InputEventMouseButton and event.pressed \
+			and event.button_index == MOUSE_BUTTON_LEFT and not DialogueManager.active:
+			DialogueManager.start("sun_bmp"))
 	var open_eyes := func():
 		if is_instance_valid(img):
 			img.texture = _sun_tex(true)
+			img.mouse_filter = Control.MOUSE_FILTER_STOP
+			awake[0] = true
+			if is_instance_valid(caption):
+				caption.text = "sun.bmp is looking at you. click to speak."
+				caption.add_theme_color_override("font_color", Color(0.6, 0.45, 0.1))
 			AudioBus.play_sfx("tick", 0.7, -8.0)
 	var tw := w.create_tween()
 	tw.tween_interval(1.4)
@@ -430,7 +449,8 @@ func _open_hold() -> void:
 	_hold_time = _make_label("0:00 / 0:00", Vector2(64, 52), Vector2(90, 12), 8, Color(0.7, 0.95, 0.85))
 	w.content.add_child(_hold_time)
 	w.content.add_child(_make_label("you are caller number 1. you have always been caller number 1.", Vector2(10, 72), Vector2(190, 14), 7, Color(0.45, 0.65, 0.6)))
-	# Hold music rides the SFX pool via play_stream — room music is untouched.
+	# The room music yields the floor while the hold music has it.
+	AudioBus.duck_music()
 	_hold_player = AudioBus.play_stream(AssetLib.music("hold"), 1.0, -4.0)
 	_register_window("hold", w)
 
@@ -479,13 +499,19 @@ func _open_voicemail() -> void:
 	_vm_label = _make_label(VM_TEXT, Vector2(8, 22), Vector2(208, 52), 9, Color(0.75, 0.95, 0.8))
 	_vm_label.visible_characters = 0
 	w.content.add_child(_vm_label)
+	# Silence the room music for the length of the message.
+	AudioBus.duck_music()
 	_vm_player = AudioBus.play_stream(_voicemail_stream(), 1.0, -2.0)
 	_register_window("voicemail", w)
-	# Subtitles type out across the garble — roughly the length of the tape.
+	# Subtitles type out across the garble; the music comes back when the
+	# voicemail is over (unless the hold music is also mid-performance).
 	var tw := w.create_tween()
 	tw.tween_interval(0.6)
 	tw.tween_property(_vm_label, "visible_characters", VM_TEXT.length(), 8.8)
-	tw.tween_callback(func(): hdr.text = "end of message. the machine has nothing further.")
+	tw.tween_callback(func():
+		hdr.text = "end of message. the machine has nothing further."
+		if not _open_windows.has("hold"):
+			AudioBus.resume_ducked())
 
 
 func _open_recycle() -> void:
@@ -595,7 +621,7 @@ func _reveal_basement_key() -> void:
 
 # ============================================================== UI helpers
 
-## Chunky 3D panel: light top/left, shadow bottom/right — plastic that has
+## Chunky 3D panel: light top/left, shadow bottom/right - plastic that has
 ## seen things. sunken=true swaps the bevel for inset areas (documents, clock).
 func _bevel_panel(sz: Vector2, face: Color, sunken := false) -> Control:
 	var root := Control.new()
@@ -715,7 +741,7 @@ func _build_icon(id: String) -> Texture2D:
 			p.rect(2, 3, 8, 5, Color(0.55, 0.8, 0.95))
 			p.rect(2, 8, 8, 2, Color(0.35, 0.7, 0.3))
 			p.circle(6, 5, 1.8, Color(0.14, 0.42, 0.18))
-			p.rect(5, 6, 2, 2, Color(0.45, 0.75, 0.35))
+			p.rect(5, 6, 2, 2, Color(0.96, 0.82, 0.3))
 		"sun":
 			p.circle(6, 6, 3.5, Color(0.98, 0.85, 0.2))
 			for d in [Vector2(6, 1), Vector2(6, 11), Vector2(1, 6), Vector2(11, 6), Vector2(2, 2), Vector2(10, 2), Vector2(2, 10), Vector2(10, 10)]:
@@ -785,7 +811,7 @@ func _me_tex() -> Texture2D:
 		p.circle(32, 14, 3.5, fro)
 		p.circle(28, 11, 4, fro)
 		p.circle(28, 15, 4.5, fro)
-		p.rect(24, 18, 9, 7, Color(0.45, 0.75, 0.35))
+		p.rect(24, 18, 9, 7, Color(0.96, 0.82, 0.3))
 		p.poly(PackedVector2Array([Vector2(24, 19), Vector2(33, 19), Vector2(28, 22)]), Color(1.0, 0.55, 0.1))
 		p.hline(27, 23, 3, Color(0.1, 0.25, 0.08))
 		# the shirt clashes on purpose (it was a gift)
@@ -819,7 +845,7 @@ func _sun_tex(eyes_open: bool) -> Texture2D:
 			var a := TAU * float(i) / 12.0
 			p.line(int(round(30.0 + cos(a) * 13.0)), int(round(22.0 + sin(a) * 13.0)),
 				int(round(30.0 + cos(a) * 17.0)), int(round(22.0 + sin(a) * 17.0)), Color(0.95, 0.62, 0.1))
-		# the same gentle smile in both states — that's the problem
+		# the same gentle smile in both states - that's the problem
 		p.hline(27, 28, 7, dark)
 		p.dot(26, 27, dark)
 		p.dot(34, 27, dark)
@@ -849,7 +875,7 @@ func _key_tex() -> Texture2D:
 		var shade := Color(0.16, 0.15, 0.18)
 		p.rect(0, 0, 56, 40, Color(0.04, 0.04, 0.05))
 		p.speckle(0, 0, 56, 40, Color(0.09, 0.09, 0.11), 0.25, 77)
-		# a key, barely — one shade above the dark it lives in
+		# a key, barely - one shade above the dark it lives in
 		p.ellipse_outline(18, 20, 5, 5, shade)
 		p.ellipse_outline(18, 20, 2.5, 2.5, shade)
 		p.rect(23, 19, 14, 3, shade)

@@ -10,8 +10,8 @@ const GRID_W := 24
 const GRID_H := 36
 const PX := 2
 
-const SKIN := Color(0.45, 0.75, 0.35)
-const SKIN_DARK := Color(0.12, 0.32, 0.12)
+const SKIN := Color(0.96, 0.82, 0.3)
+const SKIN_DARK := Color(0.55, 0.42, 0.08)
 const FRO := Color(0.16, 0.5, 0.2)
 const FRO_DARK := Color(0.06, 0.24, 0.08)
 const SHELL := Color(0.95, 0.55, 0.12)

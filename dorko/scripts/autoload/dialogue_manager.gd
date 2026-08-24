@@ -21,6 +21,7 @@ const PITCH := {
 	"Blue Bomb": 1.45,
 	"The Turquoise One": 1.02,
 	"Winders XD": 1.25,
+	"sun.bmp": 1.6,
 	"???": 1.15,
 	"Ref": 1.3,
 }
@@ -30,6 +31,7 @@ const NAME_COLORS := {
 	"Couch Guy": Color(0.75, 0.72, 0.68),
 	"Blue Bomb": Color(0.55, 0.65, 1.0),
 	"The Turquoise One": Color(0.3, 0.95, 0.85),
+	"sun.bmp": Color(1.0, 0.85, 0.25),
 }
 
 const USE_FAIL_LINES := [
@@ -110,6 +112,9 @@ func _build_ui() -> void:
 	_catcher.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_catcher.mouse_filter = Control.MOUSE_FILTER_STOP
 	_catcher.gui_input.connect(_on_catcher_input)
+	# Hidden at the CONTROL level, not just the CanvasLayer: controls under a
+	# hidden CanvasLayer can still swallow GUI clicks meant for overlays.
+	_catcher.visible = false
 	add_child(_catcher)
 
 	_panel = PanelContainer.new()
@@ -120,8 +125,10 @@ func _build_ui() -> void:
 	style.set_corner_radius_all(3)
 	style.set_content_margin_all(8)
 	_panel.add_theme_stylebox_override("panel", style)
-	_panel.position = Vector2(10, 266)
-	_panel.size = Vector2(620, 88)
+	# Tall enough for a name row plus five wrapped lines at font 10; long
+	# monologue nodes were overflowing the original 88px box.
+	_panel.position = Vector2(10, 250)
+	_panel.size = Vector2(620, 104)
 	_catcher.add_child(_panel)
 
 	var hbox := HBoxContainer.new()
@@ -144,19 +151,20 @@ func _build_ui() -> void:
 	_text_label = Label.new()
 	_text_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_text_label.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	_text_label.add_theme_font_size_override("font_size", 11)
+	_text_label.clip_text = true
+	_text_label.add_theme_font_size_override("font_size", 10)
 	text_col.add_child(_text_label)
 
 	_advance_arrow = Label.new()
 	_advance_arrow.text = "v"
-	_advance_arrow.position = Vector2(600, 66)
+	_advance_arrow.position = Vector2(598, 84)
 	_advance_arrow.add_theme_color_override("font_color", Color(1.0, 0.55, 0.1))
 	_panel.add_child(_advance_arrow)
 
 	_choices_box = VBoxContainer.new()
 	_choices_box.add_theme_constant_override("separation", 2)
-	_choices_box.position = Vector2(240, 120)
-	_choices_box.size = Vector2(380, 140)
+	_choices_box.position = Vector2(240, 92)
+	_choices_box.size = Vector2(380, 152)  # sits just above the (taller) panel
 	_choices_box.alignment = BoxContainer.ALIGNMENT_END
 	_catcher.add_child(_choices_box)
 
@@ -172,6 +180,7 @@ func start(id: String, node_key := "start") -> void:
 		return
 	active = true
 	visible = true
+	_catcher.visible = true
 	GameState.lock_input()
 	_tree_id = id
 	dialogue_started.emit(id)
@@ -266,6 +275,8 @@ func _portrait_id(speaker: String) -> String:
 	match speaker:
 		"The Turquoise One":
 			return "turquoise_one"
+		"sun.bmp":
+			return "sun_bmp"
 		_:
 			return speaker.to_snake_case()
 
@@ -403,6 +414,7 @@ func _clear_choices() -> void:
 func _close() -> void:
 	active = false
 	visible = false
+	_catcher.visible = false
 	GameState.unlock_input()
 	var finished_id := _tree_id
 	_tree_id = ""

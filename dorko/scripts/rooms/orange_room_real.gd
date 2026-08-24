@@ -1,5 +1,5 @@
 extends BaseRoom
-## The conclusion, part 2 (spec 8): the Orange Room — but the real one.
+## The conclusion, part 2 (spec 8): the Orange Room - but the real one.
 ## Morning light through an actual window. The sun outside has the correct
 ## number of teeth (zero; it's just a sun). The pizza roll box is unopened.
 ## The PC is off. There's a birthday card on the desk with today's date.
@@ -44,7 +44,7 @@ func _on_room_entered() -> void:
 	dorko.face_towards(Vector2(150, 220))
 	await _wait(0.8)
 	var date := Time.get_date_dict_from_system()
-	say("A card, on the desk. \"Happy Birthday Dorko — love, everyone.\" Dated %02d/%02d. That's today. Today's real." % [date.month, date.day])
+	say("A card, on the desk. \"Happy Birthday Dorko - love, everyone.\" Dated %02d/%02d. That's today. Today's real." % [date.month, date.day])
 	await DialogueManager.dialogue_finished
 	await _wait(0.8)
 	# then the carpet. same spot as the opening. same pose, other direction.
@@ -260,8 +260,8 @@ func _build_sitting_tex() -> Texture2D:
 	p.ellipse(15, 19, 8, 6, Color(0.55, 0.28, 0.04))
 	p.ellipse(15, 18, 7, 5, Color(0.95, 0.55, 0.12))
 	p.ellipse_outline(15, 18, 7, 5, Color(0.99, 0.9, 0.72))
-	p.ellipse(8, 23, 3, 2, Color(0.45, 0.75, 0.35))   # folded legs peeking out
-	p.ellipse(22, 23, 3, 2, Color(0.45, 0.75, 0.35))
+	p.ellipse(8, 23, 3, 2, Color(0.96, 0.82, 0.3))   # folded legs peeking out
+	p.ellipse(22, 23, 3, 2, Color(0.96, 0.82, 0.3))
 	return p.tex()
 
 

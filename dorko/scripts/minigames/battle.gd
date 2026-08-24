@@ -4,7 +4,7 @@ extends Node2D
 ## telegraphs an enormous attack with a full three-second wind-up.
 ## It dies in one hit. Any hit. That is the fight.
 ##
-## Controls: A/D dodge, W block (both entirely cosmetic — the joke),
+## Controls: A/D dodge, W block (both entirely cosmetic - the joke),
 ## LMB/RMB jabs (either ends it), Space = star uppercut (permanently
 ## unavailable; you've never had any stars).
 
@@ -565,9 +565,9 @@ func _draw_dorko_back(pose: String) -> Texture2D:
 	var p: Painter = AssetLib.painter(40, 44, 2)
 	var fro := Color(0.16, 0.5, 0.2)
 	var fro_dk := Color(0.06, 0.24, 0.08)
-	var skin := Color(0.45, 0.75, 0.35)
+	var skin := Color(0.96, 0.82, 0.3)
 	var up := pose == "guard_up"
-	# afro from behind — the star of this camera angle
+	# afro from behind - the star of this camera angle
 	p.circle(20, 11, 11, fro_dk)
 	p.circle(20, 11, 10, fro)
 	p.circle(12, 13, 5, fro)
@@ -582,8 +582,8 @@ func _draw_dorko_back(pose: String) -> Texture2D:
 	var fy := 22 if up else 30
 	p.circle(6, fy, 4, skin)
 	p.circle(34, fy, 4, skin)
-	p.circle(6, fy, 2, Color(0.6, 0.85, 0.5))
-	p.circle(34, fy, 2, Color(0.6, 0.85, 0.5))
+	p.circle(6, fy, 2, Color(1.0, 0.92, 0.55))
+	p.circle(34, fy, 2, Color(1.0, 0.92, 0.55))
 	# stubby legs
 	p.rect(14, 38, 4, 5, skin)
 	p.rect(22, 38, 4, 5, skin)
@@ -592,10 +592,10 @@ func _draw_dorko_back(pose: String) -> Texture2D:
 
 func _build_fist_tex() -> Texture2D:
 	var p: Painter = AssetLib.painter(16, 16, 2)
-	p.circle(8, 8, 6, Color(0.12, 0.32, 0.12))
-	p.circle(8, 8, 5, Color(0.45, 0.75, 0.35))
-	p.hline(5, 6, 6, Color(0.6, 0.85, 0.5))
-	p.dot(4, 10, Color(0.3, 0.55, 0.25))
+	p.circle(8, 8, 6, Color(0.55, 0.42, 0.08))
+	p.circle(8, 8, 5, Color(0.96, 0.82, 0.3))
+	p.hline(5, 6, 6, Color(1.0, 0.92, 0.55))
+	p.dot(4, 10, Color(0.72, 0.58, 0.15))
 	return p.tex()
 
 

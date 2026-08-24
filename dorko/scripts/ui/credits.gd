@@ -5,7 +5,7 @@ extends Control
 ## Ends by setting game_completed and returning to the main menu.
 
 const BEAT_MS := 600
-const HIT_WINDOW_MS := 100
+const HIT_WINDOW_MS := 150  # matches the microwave's forgiving window
 const UNLOCK_HITS := 10
 const SCROLL_SPEED := 22.0  # px/s
 
@@ -14,22 +14,22 @@ const LINES := [
 	"",
 	"a house, in order of appearance",
 	"",
-	"DORKO — himself",
-	"THE COUCH GUY — the couch's",
-	"WINDERS XD — as itself, unfortunately",
-	"THE PIZZA ROLLS — 600ms apart, forever",
-	"THE BLUE BOMB — retired",
-	"GALAXY NIBBLER — load-bearing cabinet",
-	"THE TURQUOISE ONE — down for the count",
+	"DORKO - himself",
+	"THE COUCH GUY - the couch's",
+	"WINDERS XD - as itself, unfortunately",
+	"THE PIZZA ROLLS - 600ms apart, forever",
+	"THE BLUE BOMB - retired",
+	"GALAXY NIBBLER - load-bearing cabinet",
+	"THE TURQUOISE ONE - down for the count",
 	"",
-	"sandwich continuity — the kitchen",
-	"600ms compliance officer — the microwave",
-	"wire order archivist — the VHS shelf",
-	"crowd noise — pitched disappointment",
-	"marble wrangling — the ramune bottle",
-	"afro structural engineering — the afro",
-	"window authenticity consultant — the kitchen window",
-	"laugh track — laughed alone, at night",
+	"sandwich continuity - the kitchen",
+	"600ms compliance officer - the microwave",
+	"wire order archivist - the VHS shelf",
+	"crowd noise - pitched disappointment",
+	"marble wrangling - the ramune bottle",
+	"afro structural engineering - the afro",
+	"window authenticity consultant - the kitchen window",
+	"laugh track - laughed alone, at night",
 	"",
 	"all art, music and noise were grown",
 	"inside this cartridge from raw math",

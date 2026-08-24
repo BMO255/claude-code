@@ -12,6 +12,32 @@ func fail(msg: String) -> void:
 	ok = false
 
 
+func _find_hotspot(name_: String) -> Hotspot:
+	var room = get_tree().current_scene
+	if room == null or not ("hotspots_node" in room):
+		return null
+	for h in room.hotspots_node.get_children():
+		if h is Hotspot and h.hotspot_name == name_:
+			return h
+	return null
+
+
+## Injects a full synthetic click (press + release) at a canvas position.
+func _click(pos: Vector2) -> void:
+	var ev := InputEventMouseButton.new()
+	ev.button_index = MOUSE_BUTTON_LEFT
+	ev.pressed = true
+	ev.position = pos
+	ev.global_position = pos
+	Input.parse_input_event(ev)
+	var up := InputEventMouseButton.new()
+	up.button_index = MOUSE_BUTTON_LEFT
+	up.pressed = false
+	up.position = pos
+	up.global_position = pos
+	Input.parse_input_event(up)
+
+
 ## Clicks through any open (and queued) dialogue until the box is closed.
 func drain_dialogue() -> void:
 	for i in 40:
@@ -64,27 +90,29 @@ func run() -> void:
 		# force it shut so the room tour can proceed
 		DialogueManager._close()
 
-	# --- M2: pizza-roll timing math (pure function; the exact spec windows)
+	# --- M2: pizza-roll timing math (pure function; the forgiving windows)
 	var pizza = load("res://scripts/minigames/pizza_roll.gd")
 	if pizza:
 		var t0 := 100000
 		if pizza.classify(t0 + 600, t0) != "PERFECT":
 			fail("pizza classify: exact beat should be PERFECT")
-		if pizza.classify(t0 + 600 + 99, t0) != "OK":
-			fail("pizza classify: +99ms should be OK")
-		if pizza.classify(t0 + 600 - 99, t0) != "OK":
-			fail("pizza classify: -99ms should be OK")
-		if pizza.classify(t0 + 600 + 101, t0) != "MISS":
-			fail("pizza classify: +101ms should be MISS")
-		if pizza.classify(t0 + 600 - 101, t0) != "MISS":
-			fail("pizza classify: -101ms should be MISS")
-		if pizza.classify(t0 - 200, t0) != "":
+		if pizza.classify(t0 + 600 + 59, t0) != "PERFECT":
+			fail("pizza classify: +59ms should be PERFECT")
+		if pizza.classify(t0 + 600 + 149, t0) != "OK":
+			fail("pizza classify: +149ms should be OK")
+		if pizza.classify(t0 + 600 - 149, t0) != "OK":
+			fail("pizza classify: -149ms should be OK")
+		if pizza.classify(t0 + 600 + 151, t0) != "MISS":
+			fail("pizza classify: +151ms should be off-beat")
+		if pizza.classify(t0 + 600 - 151, t0) != "MISS":
+			fail("pizza classify: -151ms should be off-beat")
+		if pizza.classify(t0 - 250, t0) != "":
 			fail("pizza classify: pre-window click should be free")
 
-	# --- M2: keypad knows the birthday backwards
+	# --- M2: keypad knows the birthday (mm then dd)
 	var keypad = load("res://scripts/minigames/keypad.gd")
-	if keypad and keypad.CODE != "4170":
-		fail("keypad code is not 4170")
+	if keypad and keypad.CODE != "0929":
+		fail("keypad code is not 0929")
 
 	# --- M4: wire panel rules (red -> yellow -> blue; green = the joke)
 	var wires = load("res://scripts/minigames/wire_panel.gd")
@@ -103,6 +131,51 @@ func run() -> void:
 			fail("wires: yellow first should be wrong")
 		if wires.judge(["red"], "purple") != "wrong":
 			fail("wires: purple should always be wrong")
+
+	# --- regression: the toaster must finish its cycle (reported freeze)
+	if ResourceLoader.exists("res://scenes/rooms/kitchen.tscn"):
+		print("SMOKE: toaster cycle")
+		GameState.new_game()
+		await SceneRouter.goto_room("kitchen")
+		await get_tree().create_timer(1.0).timeout
+		await drain_dialogue()
+		Inventory.add_item("bread", true)
+		var toaster := _find_hotspot("Toaster")
+		if toaster == null:
+			fail("toaster hotspot missing")
+		else:
+			toaster.do_use("bread")
+			await get_tree().create_timer(4.5).timeout
+			await drain_dialogue()
+			if not Inventory.has_item("toast"):
+				fail("toaster did not produce toast (reported freeze)")
+			if Inventory.has_item("bread"):
+				fail("toaster left the bread behind")
+			if GameState.is_input_locked():
+				fail("toaster left input locked")
+
+	# --- regression: the poster note close-up must dismiss on click
+	if ResourceLoader.exists("res://scenes/rooms/orange_room.tscn"):
+		print("SMOKE: note closeup dismiss")
+		GameState.new_game()
+		GameState.set_flag("intro_done")
+		await SceneRouter.goto_room("orange_room")
+		await get_tree().create_timer(1.0).timeout
+		await drain_dialogue()
+		var poster := _find_hotspot("Sun Poster")
+		if poster == null:
+			fail("poster hotspot missing")
+		else:
+			poster.do_touch()
+			await get_tree().create_timer(0.8).timeout
+			if not SceneRouter.has_overlay():
+				fail("note closeup did not open")
+			else:
+				_click(Vector2(320, 180))
+				await get_tree().create_timer(0.6).timeout
+				if SceneRouter.has_overlay():
+					fail("note closeup did not dismiss on click")
+					SceneRouter.pop_overlay()
 
 	# --- visit every room that exists
 	print("SMOKE: touring rooms")

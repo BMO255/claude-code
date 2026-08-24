@@ -7,17 +7,18 @@ extends Control
 ## Pushed by the orange room via SceneRouter.push_overlay(
 ##   load("res://scripts/minigames/pizza_roll.gd").new()); it pops itself.
 ## Self-contained: autoloads + core classes only; texture keys "pizza_mg_*".
-## All timing derives from Time.get_ticks_msec() against one anchor (_t0) —
-## never frame deltas — so the visuals and the judgment share one clock.
+## All timing derives from Time.get_ticks_msec() against one anchor (_t0) -
+## never frame deltas - so the visuals and the judgment share one clock.
 
 # ---- rhythm constants --------------------------------------------------------
 const BEAT_MS := 600          # one beat every 600 ms
-const HIT_WINDOW_MS := 100    # |now - nearest beat| <= 100 ms is a hit...
-const PERFECT_MS := 40        # ...and <= 40 ms of those are PERFECT
+const HIT_WINDOW_MS := 150    # |now - nearest beat| <= 150 ms is a hit...
+const PERFECT_MS := 60        # ...and <= 60 ms of those are PERFECT
 const WIN_COMBO := 10         # consecutive hits to win
-const MAX_MISSES := 3         # total misses to detonate
+const MAX_MISSES := 3         # ignored beats to detonate
 const COUNTIN_BEATS := 3      # the 3-2-1
 const COUNTIN_LEAD_MS := 450  # a breath before the first count beat
+const CLICK_DEBOUNCE_MS := 130  # accidental double-fires are ignored outright
 
 # ---- layout ------------------------------------------------------------------
 const RING_CENTER := Vector2(320.0, 172.0)
@@ -38,6 +39,7 @@ var _combo := 0
 var _misses := 0
 var _outcome := ""            # "" | "win" | "explode" | "quit" (tests read this)
 var _swell_kick_ms := -100000
+var _last_click_ms := -100000
 var _plate_stopped := false
 
 var _plate_spin: Node2D
@@ -92,10 +94,10 @@ func _begin_countin() -> void:
 # ============================================================== timing core
 
 ## Pure hit-test (unit-tested headlessly). Beats fire at t0 + k*600, k >= 0.
-## Returns "PERFECT" (|delta| <= 40), "OK" (<= 100), "MISS" (outside every
+## Returns "PERFECT" (|delta| <= 60), "OK" (<= 150), "MISS" (outside every
 ## window), or "" for clicks before beat 0's window even opens (count-in
-## enthusiasm — free, this once). Beats are 600 ms apart, so the distance to
-## the NEAREST beat is at most 300 ms; anything past 100 is a miss.
+## enthusiasm - free, this once). Beats are 600 ms apart, so the distance to
+## the NEAREST beat is at most 300 ms; anything past 150 is off-beat.
 static func classify(now_ms: int, t0_ms: int) -> String:
 	var rel := now_ms - t0_ms
 	if rel < -HIT_WINDOW_MS:
@@ -125,6 +127,9 @@ func _judge_expired(now: int) -> void:
 func _handle_click(now: int, pos: Vector2) -> void:
 	if _phase != Phase.PLAY and _phase != Phase.COUNTIN:
 		return
+	if now - _last_click_ms < CLICK_DEBOUNCE_MS:
+		return  # twitchy double-fire; costs nothing
+	_last_click_ms = now
 	# resolve older beats first so a late click can't be credited backwards
 	_judge_expired(now)
 	if _phase == Phase.DONE:
@@ -134,12 +139,25 @@ func _handle_click(now: int, pos: Vector2) -> void:
 		return
 	var k := nearest_beat(now, _t0)
 	if verdict == "MISS" or k < _next_unjudged:
-		# outside every window, or inside one that's already been spent
-		# (double-click). Enthusiasm is not accuracy.
-		_register_miss(pos)
+		# Forgiving mode: an off-beat click (or one aimed at an already-spent
+		# beat) resets the streak but does NOT swell the box. Only beats you
+		# ignore entirely count toward the explosion.
+		_combo = 0
+		_fx_stray(now, pos)
 		return
 	_next_unjudged = k + 1
 	_register_hit(verdict)
+
+
+## Feedback for a click that missed the window: which side did it land on?
+func _fx_stray(now: int, pos: Vector2) -> void:
+	if not is_inside_tree():
+		return
+	AudioBus.play_sfx("tick", 0.7, -6.0)
+	var k := nearest_beat(now, _t0)
+	var early := (now - _t0) < k * BEAT_MS
+	_spawn_feedback("EARLY" if early else "LATE", Color(0.95, 0.7, 0.3), pos + Vector2(0, -30), 12)
+	_bump_combo_label()
 
 
 func _register_hit(verdict: String) -> void:
@@ -713,7 +731,7 @@ func _hum_stream() -> AudioStreamWAV:
 # ============================================================== inner classes
 
 ## The telegraph: a fixed gold target ring plus pink rings that contract onto
-## it. All radii derive from (now - t0) — the same clock the judgment uses —
+## it. All radii derive from (now - t0) - the same clock the judgment uses -
 ## so what you see and what gets scored can never disagree.
 class RingLayer:
 	extends Node2D
@@ -740,7 +758,7 @@ class RingLayer:
 			Color(TARGET_COL.r, TARGET_COL.g, TARGET_COL.b, 0.10 + 0.25 * flash), 7.0)
 		draw_arc(Vector2.ZERO, TARGET_R, 0.0, TAU, 48, Color(TARGET_COL, 0.85), 3.0)
 		if pulsing:
-			# k_up is the next beat index (negative during the count-in — same
+			# k_up is the next beat index (negative during the count-in - same
 			# clock). A ring for beat k spawns one beat early at START_R and
 			# contracts linearly, arriving at TARGET_R exactly at t0 + k*600.
 			# Two are drawn so the beat after next is already faintly inbound.

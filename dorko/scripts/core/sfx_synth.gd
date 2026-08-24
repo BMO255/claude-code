@@ -1,7 +1,7 @@
 class_name SfxSynth
 extends RefCounted
-## Procedural audio toolbox. Everything the game plays — SFX, voice blips,
-## music — is rendered from these helpers into 16-bit mono AudioStreamWAVs.
+## Procedural audio toolbox. Everything the game plays - SFX, voice blips,
+## music - is rendered from these helpers into 16-bit mono AudioStreamWAVs.
 ## Samples are PackedFloat32Array in [-1, 1]; to_wav() converts at the end.
 
 const RATE := 22050

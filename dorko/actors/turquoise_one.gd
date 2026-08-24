@@ -49,7 +49,7 @@ func _build_tex() -> Texture2D:
 	# sheen down one side
 	p.vline(9, 14, 26, tq_hi)
 	p.dot(9, 5, tq_hi)
-	# the visor — Dorko's visor. that's the reveal.
+	# the visor - Dorko's visor. that's the reveal.
 	p.poly(PackedVector2Array([Vector2(6, 6), Vector2(18, 6), Vector2(12, 10)]), Color(1.0, 0.55, 0.1))
 	p.line(6, 6, 18, 6, Color(0.62, 0.26, 0.0))
 	p.line(6, 6, 12, 10, Color(0.62, 0.26, 0.0))

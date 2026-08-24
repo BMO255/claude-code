@@ -102,7 +102,7 @@ func default_walk_poly(inset := 8.0) -> PackedVector2Array:
 func _build_nav_region() -> void:
 	var region := NavigationRegion2D.new()
 	var nav_poly := NavigationPolygon.new()
-	# Triangulate the walk polygon directly — deterministic, no baking pass.
+	# Triangulate the walk polygon directly - deterministic, no baking pass.
 	nav_poly.vertices = walk_poly
 	var indices := Geometry2D.triangulate_polygon(walk_poly)
 	for i in range(0, indices.size() - 2, 3):

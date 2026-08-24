@@ -1,5 +1,5 @@
 extends BaseRoom
-## The Orange Room — where Dorko wakes up. Three shades of orange that almost
+## The Orange Room - where Dorko wakes up. Three shades of orange that almost
 ## match, a bulb on a cord, a door that wants a number, and a window that is
 ## a painting of a window. Spec 7.1.
 
@@ -587,7 +587,7 @@ func _build_door_open_tex() -> Texture2D:
 func _paint_door(p: Painter, open: bool) -> void:
 	# Perspective baked in: both door edges converge on the room's back-right
 	# corner. Far (left) edge is short, near (right) edge tall. A saturated
-	# teal door on an orange wall — they argue, quietly, forever.
+	# teal door on an orange wall - they argue, quietly, forever.
 	p.poly(PackedVector2Array([
 		Vector2(0, 24), Vector2(43, 0), Vector2(43, 103), Vector2(0, 69),
 	]), Color(0.05, 0.28, 0.26))
@@ -679,7 +679,7 @@ class SwingBulb extends Node2D:
 
 class NoteCloseup extends Control:
 	## Brief close-up of the sticky note behind the poster corner:
-	## "your birthday backwards", plus a cake with too many candles.
+	## "mmdd to get out bday boy", plus a cake with too many candles.
 	## Click anywhere or Esc to put the poster back.
 
 	func _ready() -> void:
@@ -696,12 +696,12 @@ class NoteCloseup extends Control:
 		note.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		add_child(note)
 		var scrawl := Label.new()
-		scrawl.text = "your birthday\nbackwards"
-		scrawl.position = Vector2(252, 104)
-		scrawl.size = Vector2(140, 48)
+		scrawl.text = "mmdd to get out\nbday boy"
+		scrawl.position = Vector2(238, 100)
+		scrawl.size = Vector2(168, 52)
 		scrawl.rotation = -0.05
 		scrawl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		scrawl.add_theme_font_size_override("font_size", 13)
+		scrawl.add_theme_font_size_override("font_size", 12)
 		scrawl.add_theme_color_override("font_color", Color(0.22, 0.2, 0.38))
 		add_child(scrawl)
 		var hint := Label.new()
@@ -717,12 +717,23 @@ class NoteCloseup extends Control:
 
 	func _on_gui(event: InputEvent) -> void:
 		if event is InputEventMouseButton and event.pressed:
-			SceneRouter.pop_overlay()
+			_dismiss()
 
-	func _unhandled_input(event: InputEvent) -> void:
-		if event is InputEventKey and event.pressed \
+	# _input (not just gui_input) so the click ALWAYS lands: this is a
+	# "click anywhere to look away" screen - swallowing every click is the
+	# desired behavior, and it can't be shadowed by other GUI layers.
+	func _input(event: InputEvent) -> void:
+		if event is InputEventMouseButton and event.pressed:
+			get_viewport().set_input_as_handled()
+			_dismiss()
+		elif event is InputEventKey and event.pressed \
 			and (event.keycode == KEY_ESCAPE or event.physical_keycode == KEY_ESCAPE):
-			accept_event()
+			get_viewport().set_input_as_handled()
+			_dismiss()
+
+	func _dismiss() -> void:
+		if SceneRouter.top_overlay() == self:
+			AudioBus.play_sfx("click", 0.8, -8.0)
 			SceneRouter.pop_overlay()
 
 	func _build_note_tex() -> Texture2D:

@@ -67,7 +67,7 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("inventory") and not DialogueManager.active and not _paused:
 		_bar_pinned = not _bar_pinned
 	if event.is_action_pressed("pause"):
-		# One Esc, several meanings — priority order matters here.
+		# One Esc, several meanings - priority order matters here.
 		if CursorManager.verb == CursorManager.VERB_ITEM:
 			CursorManager.clear_item()
 		elif _paused:
@@ -177,7 +177,8 @@ func bubble(target: Node2D, text: String, pitch := 1.0, duration := 2.6) -> void
 	var lbl := Label.new()
 	lbl.text = text
 	lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	lbl.custom_minimum_size = Vector2(min(150.0, text.length() * 5.5 + 20.0), 0)
+	# wide enough that typical barks stay on one or two lines
+	lbl.custom_minimum_size = Vector2(minf(230.0, text.length() * 6.5 + 26.0), 0)
 	lbl.add_theme_color_override("font_color", Color(0.12, 0.08, 0.15))
 	lbl.add_theme_font_size_override("font_size", 10)
 	panel.add_child(lbl)
@@ -234,7 +235,7 @@ func _build_pause_menu() -> void:
 	vbox.add_theme_constant_override("separation", 6)
 	panel.add_child(vbox)
 	var title := Label.new()
-	title.text = "— PAUSED —"
+	title.text = "- PAUSED -"
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	vbox.add_child(title)
 	for entry in [["Resume", _on_resume], ["Save", _on_save], ["Options", _on_options], ["Main Menu", _on_main_menu]]:

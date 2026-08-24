@@ -94,6 +94,15 @@ func _draw_pose(which: String) -> Texture2D:
 	p.speckle(hx - 10, hy - 9, 20, 6, Color(0.7, 0.7, 0.74), 0.3, 5)
 	p.speckle(hx - 11, hy - 3, 4, 9, Color(0.7, 0.7, 0.74), 0.25, 6)
 	p.speckle(hx + 7, hy - 3, 4, 9, Color(0.7, 0.7, 0.74), 0.25, 7)
+	# the red star, front and center on the ushanka
+	var star := Color(0.85, 0.15, 0.12)
+	p.dot(hx, hy - 7, star)
+	p.dot(hx - 1, hy - 6, star)
+	p.dot(hx, hy - 6, star)
+	p.dot(hx + 1, hy - 6, star)
+	p.dot(hx - 1, hy - 5, star)
+	p.dot(hx + 1, hy - 5, star)
+	p.dot(hx, hy - 5, Color(1.0, 0.4, 0.35))  # glint at the heart of the star
 
 	if facing_room:
 		# the turn: full face, eyes open wider than you'd like
