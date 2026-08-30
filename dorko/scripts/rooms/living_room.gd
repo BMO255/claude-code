@@ -64,6 +64,7 @@ func _room_config() -> void:
 func _room_setup() -> void:
 	_build_walls()
 	add_floor("solid", Color(0.5, 0.36, 0.2), Color(0.44, 0.31, 0.17))
+	AssetLib.get_or_build("living_rug_open", _build_rug_open_tex)  # for the PNG bake
 	_build_rug()
 	_build_tv()
 	_build_couch()
@@ -138,8 +139,9 @@ func _build_tv() -> void:
 	_tv.z_index = 357  # one over the stand's ground-line z
 	add_child(_tv)
 	_tv_sub = Label.new()
+	_tv_sub.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART  # before size, so it wraps
 	_tv_sub.position = Vector2(130, 318)
-	_tv_sub.size = Vector2(200, 14)
+	_tv_sub.size = Vector2(200, 26)
 	_tv_sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_tv_sub.add_theme_font_size_override("font_size", 8)
 	_tv_sub.add_theme_color_override("font_color", Color(1.0, 0.95, 0.4))

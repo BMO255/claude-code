@@ -1,23 +1,53 @@
 extends Node
-## Procedural asset factory + cache. Every texture and sound in DORKO is
-## generated at runtime from code - there are no binary assets in the repo.
-## Rooms build their own art with painter()/get_or_build(); shared art
-## (cursors, item icons, portraits, floors, SFX, music) lives here.
+## Asset factory + cache. Every texture in DORKO is a plain PNG under
+## res://assets/images/ named after its cache key - swap or repaint any of
+## them freely. The procedural drawing code is the FALLBACK generator: if a
+## PNG is missing, the texture is rebuilt from code (and, when the game runs
+## with `-- --dump-assets`, written back out as a PNG).
+## Audio is still synthesized at runtime.
+
+const IMG_DIR := "res://assets/images"
+
+var dump_enabled := false  # set from Boot: bake generated textures to PNG
 
 var _tex_cache: Dictionary = {}
 var _sfx_cache: Dictionary = {}
 var _music_cache: Dictionary = {}
 
 
+func _ready() -> void:
+	dump_enabled = Boot.dump_assets
+
+
 func painter(w: int, h: int, pixel_size := 1, bg := Color(0, 0, 0, 0)) -> Painter:
 	return Painter.new(w, h, pixel_size, bg)
 
 
-## Cache-or-create for room-local art. builder receives no args and returns Texture2D.
+## Cache -> PNG on disk -> procedural builder, in that order. builder receives
+## no args and returns Texture2D. Every key maps to assets/images/<key>.png.
 func get_or_build(key: String, builder: Callable) -> Texture2D:
 	if not _tex_cache.has(key):
-		_tex_cache[key] = builder.call()
+		_tex_cache[key] = _load_or_generate(key, builder)
 	return _tex_cache[key]
+
+
+func _load_or_generate(key: String, builder: Callable) -> Texture2D:
+	# Solid single-color fills stay in memory; they're not art worth editing.
+	var file_backed := not key.begins_with("solid_")
+	var path := "%s/%s.png" % [IMG_DIR, key]
+	if file_backed and FileAccess.file_exists(path):
+		# Loaded straight off the file (not the import cache), so an edited
+		# PNG shows up on the next run with no reimport step.
+		var img := Image.load_from_file(ProjectSettings.globalize_path(path))
+		if img != null and not img.is_empty():
+			return ImageTexture.create_from_image(img)
+	var tex: Texture2D = builder.call()
+	if dump_enabled and file_backed and tex is ImageTexture:
+		var baked: Image = (tex as ImageTexture).get_image()
+		if baked != null:
+			DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(IMG_DIR))
+			baked.save_png(ProjectSettings.globalize_path(path))
+	return tex
 
 
 func solid(w: int, h: int, color: Color) -> Texture2D:

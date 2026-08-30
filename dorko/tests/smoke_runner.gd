@@ -52,6 +52,18 @@ func run() -> void:
 	GameState.new_game()
 	GameState.settings.text_speed = 5000.0
 
+	# When baking PNGs, force-build the shared catalogs up front so nothing
+	# depends on which code paths the tour happens to hit.
+	if Boot.dump_assets:
+		print("SMOKE: baking shared art catalogs")
+		for id in Inventory.defs:
+			AssetLib.item_icon(id)
+		for pid in ["dorko", "couch_guy", "blue_bomb", "turquoise_one", "sun_bmp", "generic"]:
+			AssetLib.portrait(pid)
+		for n in ["pixel", "cursor_eye", "cursor_hand", "cursor_mouth", "shadow", "slot_bg"]:
+			AssetLib.tex(n)
+		DorkoSprites.build()
+
 	# --- inventory + combos
 	Inventory.add_item("bread", true)
 	Inventory.add_item("sliced_meat", true)
@@ -251,7 +263,8 @@ func run() -> void:
 func _exercise_overlays() -> void:
 	for path in ["res://scripts/minigames/keypad.gd",
 			"res://scripts/minigames/pc_desktop.gd",
-			"res://scripts/minigames/pizza_roll.gd"]:
+			"res://scripts/minigames/pizza_roll.gd",
+			"res://scripts/minigames/wire_panel.gd"]:
 		if not ResourceLoader.exists(path):
 			continue
 		print("SMOKE: overlay " + path.get_file())

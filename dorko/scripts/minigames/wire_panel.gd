@@ -53,6 +53,8 @@ func _ready() -> void:
 	add_child(chest)
 	for i in COLORS.size():
 		var color: String = COLORS[i]
+		_wire_tex(color, true)  # prebuild the cut state for the PNG bake
+		_wire_tex(color, true, true)
 		var btn := TextureButton.new()
 		btn.position = Vector2(216 + i * 44, 108)
 		btn.texture_normal = _wire_tex(color, false)

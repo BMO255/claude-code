@@ -90,6 +90,13 @@ func _ready() -> void:
 	_build_taskbar()
 	_build_go_menu()
 	_build_shutdown_screen()
+	# prebuild window art so the PNG bake captures it without opening each app
+	_me_tex()
+	_sun_tex(false)
+	_sun_tex(true)
+	_wave_tex()
+	_err_tex()
+	_key_tex()
 	_boot_flash()
 
 
@@ -677,12 +684,16 @@ func _make_button(text: String, sz: Vector2, bg: Color, font_size := 8) -> Butto
 
 func _make_label(text: String, pos: Vector2, sz: Vector2, font_size: int, col: Color) -> Label:
 	var l := Label.new()
+	# Autowrap must be enabled BEFORE text/size: with wrap still off, a long
+	# line's minimum width clamps the size assignment, and the label ends up
+	# wider than the window with the text running right off it (the reported
+	# voicemail/diary/recycle-bin overflow).
+	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	l.add_theme_font_size_override("font_size", font_size)
 	l.text = text
 	l.position = pos
 	l.size = sz
-	l.add_theme_font_size_override("font_size", font_size)
 	l.add_theme_color_override("font_color", col)
-	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	return l
 

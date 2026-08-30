@@ -28,9 +28,13 @@ const SHOE_DARK := Color(0.25, 0.15, 0.06)
 static var _cached: SpriteFrames = null
 
 
+## Every frame routes through AssetLib, so each one is its own editable PNG:
+## assets/images/dorko_walk_left_2.png and so on. Right-facing frames are
+## baked separately (not runtime-flipped), so they can be edited on their own.
 static func build() -> SpriteFrames:
 	if _cached:
 		return _cached
+	var lib: Node = (Engine.get_main_loop() as SceneTree).root.get_node("/root/AssetLib")
 	var frames := SpriteFrames.new()
 	frames.remove_animation("default")
 	for dir in ["down", "up", "left", "right"]:
@@ -38,12 +42,18 @@ static func build() -> SpriteFrames:
 		frames.set_animation_speed("walk_" + dir, 8.0)
 		frames.set_animation_loop("walk_" + dir, true)
 		for f in 4:
-			frames.add_frame("walk_" + dir, _frame(dir, f, true))
+			var wf: int = f
+			var wdir: String = dir
+			frames.add_frame("walk_" + dir, lib.get_or_build("dorko_walk_%s_%d" % [dir, f],
+				func(): return _frame(wdir, wf, true)))
 		frames.add_animation("idle_" + dir)
 		frames.set_animation_speed("idle_" + dir, 2.0)
 		frames.set_animation_loop("idle_" + dir, true)
 		for f in 2:
-			frames.add_frame("idle_" + dir, _frame(dir, f * 2, false))
+			var idf: int = f
+			var idir: String = dir
+			frames.add_frame("idle_" + dir, lib.get_or_build("dorko_idle_%s_%d" % [dir, f],
+				func(): return _frame(idir, idf * 2, false)))
 	_cached = frames
 	return frames
 

@@ -6,6 +6,7 @@ extends Node
 # Set from user CLI args ("godot --path dorko -- --room kitchen").
 var launch_room: String = ""
 var smoke_test: bool = false
+var dump_assets: bool = false  # bake generated textures to assets/images/*.png
 
 
 func _enter_tree() -> void:
@@ -49,4 +50,6 @@ func _parse_args() -> void:
 					i += 1
 			"--smoke":
 				smoke_test = true
+			"--dump-assets":
+				dump_assets = true
 		i += 1

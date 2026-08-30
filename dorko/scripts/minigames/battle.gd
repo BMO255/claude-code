@@ -37,6 +37,11 @@ var _windup_tween: Tween = null
 func _ready() -> void:
 	_rng.seed = 600
 	_swell_stream = SfxSynth.to_wav(SfxSynth.sweep(90.0, 240.0, 3.0, "tri", 0.14, 0.1, 0.3))
+	# prebuild every pose so the PNG bake captures them (incl. the 30s-path punch)
+	for pose_name in ["idle", "windup", "punch", "smile_off"]:
+		_opp_tex(pose_name)
+	_dorko_tex("guard_down")
+	_dorko_tex("guard_up")
 	AudioBus.play_music("battle")
 	_build_arena()
 	_build_actors()

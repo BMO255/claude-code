@@ -30,6 +30,12 @@ func _room_setup() -> void:
 	add_floor("checker", Color(0.45, 0.29, 0.17), Color(0.38, 0.24, 0.14), 0.9)
 	_build_bulb()
 	_build_props_and_hotspots()
+	# prebuild the state-variant art so the PNG bake captures every skin
+	AssetLib.get_or_build("orange_poster_peeled", _build_poster_peeled_tex)
+	AssetLib.get_or_build("orange_basket_empty", _build_basket_empty_tex)
+	AssetLib.get_or_build("orange_door_open", _build_door_open_tex)
+	AssetLib.get_or_build("orange_door_locked", _build_door_locked_tex)
+	AssetLib.get_or_build("orange_stain", _build_stain_tex)
 	GameState.flag_changed.connect(_on_flag_changed)
 	if GameState.get_flag("pizza_exploded"):
 		_add_pizza_stain()

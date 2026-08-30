@@ -27,6 +27,12 @@ func _room_setup() -> void:
 	_build_fridge()
 	_build_counter()
 	_build_cabinet()
+	# prebuild the state-variant art so the PNG bake captures every skin
+	AssetLib.get_or_build("kitchen_magnets_eat", func(): return _build_magnets_tex(false))
+	AssetLib.get_or_build("kitchen_magnets_ate", func(): return _build_magnets_tex(true))
+	AssetLib.get_or_build("kitchen_cabinet_shut", func(): return _build_cabinet_tex(false, true))
+	AssetLib.get_or_build("kitchen_cabinet_open_full", func(): return _build_cabinet_tex(true, true))
+	AssetLib.get_or_build("kitchen_cabinet_open_empty", func(): return _build_cabinet_tex(true, false))
 
 
 # ---------------------------------------------------------------- construction
@@ -334,9 +340,10 @@ func _cabinet_tex() -> Texture2D:
 	# The open texture bakes in whether the bottle is still on the shelf, so
 	# the cache key has to encode that state too.
 	if GameState.get_flag("cabinet_open"):
-		var key := "kitchen_cabinet_open_empty" if GameState.get_flag("kitchen_ramune_taken") else "kitchen_cabinet_open_full"
-		return AssetLib.get_or_build(key, func(): return _build_cabinet_tex(true))
-	return AssetLib.get_or_build("kitchen_cabinet_shut", func(): return _build_cabinet_tex(false))
+		var with_bottle := not GameState.get_flag("kitchen_ramune_taken")
+		var key := "kitchen_cabinet_open_full" if with_bottle else "kitchen_cabinet_open_empty"
+		return AssetLib.get_or_build(key, func(): return _build_cabinet_tex(true, with_bottle))
+	return AssetLib.get_or_build("kitchen_cabinet_shut", func(): return _build_cabinet_tex(false, true))
 
 
 # ---------------------------------------------------------------- textures
@@ -494,7 +501,7 @@ func _build_breadbox_tex() -> Texture2D:
 	return p.tex()
 
 
-func _build_cabinet_tex(open: bool) -> Texture2D:
+func _build_cabinet_tex(open: bool, with_bottle: bool) -> Texture2D:
 	var p: Painter = AssetLib.painter(38, 30, 2)
 	p.rect(1, 1, 36, 28, Color(0.55, 0.42, 0.26))
 	p.rect_outline(1, 1, 36, 28, Color(0.38, 0.28, 0.16))
@@ -505,7 +512,7 @@ func _build_cabinet_tex(open: bool) -> Texture2D:
 		p.vline(19, 3, 25, Color(0.7, 0.56, 0.38))
 		p.dot(18, 15, Color(0.2, 0.2, 0.2))
 		p.dot(17, 16, Color(0.35, 0.3, 0.25))  # the puddle formerly known as latch
-		if not GameState.get_flag("kitchen_ramune_taken"):
+		if with_bottle:
 			p.rect(8, 16, 4, 9, Color(0.45, 0.7, 0.95))
 			p.rect(9, 13, 2, 3, Color(0.6, 0.82, 1.0))
 	else:

@@ -40,6 +40,11 @@ func _room_setup() -> void:
 	_build_memorabilia()
 	_build_bomb()
 	_build_arcade()
+	# prebuild the state-variant art so the PNG bake captures every skin
+	AssetLib.get_or_build("base_heater_shut", func(): return _build_heater_tex(false))
+	AssetLib.get_or_build("base_heater_open", func(): return _build_heater_tex(true))
+	AssetLib.get_or_build("base_lava_lit", func(): return _build_lava_tex(true))
+	AssetLib.get_or_build("base_lava_dim", func(): return _build_lava_tex(false))
 
 
 func _on_room_entered() -> void:

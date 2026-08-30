@@ -15,6 +15,10 @@ var _drink_timer: Timer
 
 
 func _ready() -> void:
+	# prebuild every pose so the PNG bake captures them all (and pose swaps
+	# mid-cutscene never hitch on generation)
+	for pose_name in ["idle", "drink1", "drink2", "turned", "bite"]:
+		_tex(pose_name)
 	_sprite = Sprite2D.new()
 	_sprite.texture = _tex("idle")
 	# feet-line origin: the texture bottom sits on this node's position

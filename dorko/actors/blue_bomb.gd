@@ -18,6 +18,9 @@ var _rng := RandomNumberGenerator.new()
 
 func _ready() -> void:
 	_rng.seed = 94
+	# both bodies prebuilt so the PNG bake gets the standing pose too
+	_body_tex("sit")
+	_body_tex("stand")
 	_body = Sprite2D.new()
 	_body.position = Vector2(0, -30)
 	add_child(_body)

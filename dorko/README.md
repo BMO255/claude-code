@@ -4,9 +4,12 @@ A pseudo-3D point-and-click adventure about a turtle who was supposed to be
 somewhere. Built in Godot 4 (GDScript only). Surreal, saturated, deadpan —
 and something is quietly wrong underneath the cheerfulness.
 
-Every texture, sprite, sound effect, and music loop is **generated
-procedurally at runtime** from code. There are no binary assets in this
-repository.
+**All art ships as plain PNG files in `assets/images/`** — every sprite
+frame, prop, floor, icon, and portrait is an ordinary image you can open,
+edit, or replace in any paint program. The original procedural drawing code
+remains in the scripts as the fallback generator: delete a PNG and the game
+rebuilds that texture from code on the next run. Sound and music are still
+synthesized at runtime.
 
 ---
 
@@ -200,6 +203,31 @@ Non-obvious math is commented where it lives: the pizza roll's
 the perspective floor projection in `scripts/autoload/asset_lib.gd`, and the
 depth-scaling formula (0.55 at the back wall → 1.1 at the front edge) in
 `scripts/core/base_room.gd`.
+
+## Editing the art
+
+Every texture the game uses lives at `assets/images/<key>.png`, named after
+its purpose: `dorko_walk_left_2.png`, `couch_guy_idle.png`,
+`orange_door_locked.png`, `floor_kitchen_checker.png`, `item_sandwich.png`,
+`portrait_blue_bomb.png`, `battle_opp_windup.png`, and so on. To change any
+of them:
+
+1. Edit or replace the PNG (keep the size the same unless you also want to
+   reposition things — sprites are placed by their centers, so modest size
+   changes are usually fine).
+2. Run the game. Files are read directly off disk at startup — no reimport
+   step needed.
+
+Rules of the pipeline:
+
+- **Missing PNG → regenerated from code.** Delete any file to get the
+  original procedural version back on the next run.
+- **Re-bake everything**:
+  `godot --headless --path . -- --smoke --dump-assets` plays through the
+  whole game and writes out any PNG that doesn't already exist (it never
+  overwrites your edits).
+- Dynamic effects (the TV static and channel F imagery, pulse rings, light
+  cones, the ceiling fan, confetti) are animated in code and have no PNG.
 
 ## Options
 
