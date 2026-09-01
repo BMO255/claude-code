@@ -66,13 +66,14 @@ battle and ending, and exits 0 printing `SMOKE OK`.
      while they play; *"Don't go in the basement."*), the Recycle Bin, and `DO NOT OPEN.exe`
      — dismiss the error three times to reveal `basement_key.png` ("not
      yet.", sets `pc_curiosity`).
-   - **Pizza Rolls** → the microwave rhythm game: click when the pink ring
-     lands on the gold one. The beat is **600 ms**; a hit is **±150 ms**
-     (±60 ms is PERFECT). Off-beat clicks only reset your streak — the box
-     swells only for beats you ignore entirely. **10 hits in a row** wins the
-     **Perfect Pizza Roll** (`pizza_win`). **3 misses** and the box
-     detonates (`pizza_exploded`, permanent carpet stain, box respawns).
-     You need the roll for the kitchen cabinet — win eventually.
+   - **Pizza Rolls** → the microwave rhythm game, scored like the credits:
+     click when the pink ring lands on the gold one. The beat is **600 ms**
+     and a hit is anything within **±200 ms** (±80 ms is PERFECT). **Ten
+     good clicks in total** — not in a row — win the **Perfect Pizza Roll**
+     (`pizza_win`). Off-beat clicks are completely free; the box only
+     pressurizes if you stop clicking for four straight beats, and three
+     such neglect strikes detonate it (`pizza_exploded`, permanent carpet
+     stain, box respawns). You need the roll for the kitchen cabinet.
 
 ### Room 2 — The Living Room
 1. **Mouth** the **Couch Guy** → *"Could you make me a sandwich."*

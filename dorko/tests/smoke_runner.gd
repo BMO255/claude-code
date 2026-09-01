@@ -102,24 +102,43 @@ func run() -> void:
 		# force it shut so the room tour can proceed
 		DialogueManager._close()
 
-	# --- M2: pizza-roll timing math (pure function; the forgiving windows)
+	# --- M2: pizza-roll timing math (pure function; the very lenient windows)
 	var pizza = load("res://scripts/minigames/pizza_roll.gd")
 	if pizza:
 		var t0 := 100000
 		if pizza.classify(t0 + 600, t0) != "PERFECT":
 			fail("pizza classify: exact beat should be PERFECT")
-		if pizza.classify(t0 + 600 + 59, t0) != "PERFECT":
-			fail("pizza classify: +59ms should be PERFECT")
-		if pizza.classify(t0 + 600 + 149, t0) != "OK":
-			fail("pizza classify: +149ms should be OK")
-		if pizza.classify(t0 + 600 - 149, t0) != "OK":
-			fail("pizza classify: -149ms should be OK")
-		if pizza.classify(t0 + 600 + 151, t0) != "MISS":
-			fail("pizza classify: +151ms should be off-beat")
-		if pizza.classify(t0 + 600 - 151, t0) != "MISS":
-			fail("pizza classify: -151ms should be off-beat")
-		if pizza.classify(t0 - 250, t0) != "":
+		if pizza.classify(t0 + 600 + 79, t0) != "PERFECT":
+			fail("pizza classify: +79ms should be PERFECT")
+		if pizza.classify(t0 + 600 + 199, t0) != "OK":
+			fail("pizza classify: +199ms should be OK")
+		if pizza.classify(t0 + 600 - 199, t0) != "OK":
+			fail("pizza classify: -199ms should be OK")
+		if pizza.classify(t0 + 600 + 201, t0) != "MISS":
+			fail("pizza classify: +201ms should be off-beat")
+		if pizza.classify(t0 + 600 - 201, t0) != "MISS":
+			fail("pizza classify: -201ms should be off-beat")
+		if pizza.classify(t0 - 300, t0) != "":
 			fail("pizza classify: pre-window click should be free")
+		# credits-style scoring: ten total on-beat clicks win; strays are free
+		var pz = pizza.new()
+		pz._phase = 2  # Phase.PLAY
+		pz._t0 = 10000
+		for k in range(1, 11):
+			pz._handle_click(10000 + k * 600, Vector2.ZERO)
+		if pz._outcome != "win":
+			fail("pizza scoring: ten on-beat clicks should win (got '%s', hits=%d)" % [pz._outcome, pz._hits])
+		var pq = pizza.new()
+		pq._phase = 2
+		pq._t0 = 10000
+		pq._handle_click(10000 + 300, Vector2.ZERO)   # dead center between beats
+		pq._handle_click(10000 + 900, Vector2.ZERO)   # and again
+		if pq._misses != 0:
+			fail("pizza scoring: stray clicks must not add pressure")
+		if pq._hits != 0:
+			fail("pizza scoring: stray clicks must not count as hits")
+		pz.free()
+		pq.free()
 
 	# --- M2: keypad knows the birthday (mm then dd)
 	var keypad = load("res://scripts/minigames/keypad.gd")

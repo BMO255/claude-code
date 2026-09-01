@@ -11,6 +11,7 @@ var _crawl_glow: Sprite2D
 var _lava_sprite: Sprite2D
 var _bulb_sprite: Sprite2D
 var _heater_sprite: Sprite2D
+var _trophy_sprite: Sprite2D
 var _wall_msg: Label
 var _busy := false
 var _phone_players: Array = []  # stopped on room exit so loops can't leak
@@ -45,6 +46,8 @@ func _room_setup() -> void:
 	AssetLib.get_or_build("base_heater_open", func(): return _build_heater_tex(true))
 	AssetLib.get_or_build("base_lava_lit", func(): return _build_lava_tex(true))
 	AssetLib.get_or_build("base_lava_dim", func(): return _build_lava_tex(false))
+	AssetLib.get_or_build("base_stool_empty", _build_stool_tex)
+	AssetLib.get_or_build("base_trophy", _build_trophy_tex)
 
 
 func _on_room_entered() -> void:
@@ -189,15 +192,17 @@ func _build_memorabilia() -> void:
 		"visual": bike,
 		"interact": Vector2(190, 318),
 	})
-	# --- plastic trophy on a stool
-	var trophy := add_prop(AssetLib.get_or_build("base_trophy", _build_trophy_tex), Vector2(508, 296))
+	# --- plastic trophy on a stool (just the stool once it's been claimed)
+	_trophy_sprite = add_prop(AssetLib.get_or_build("base_stool_empty", _build_stool_tex)
+		if GameState.get_flag("basement_trophy_taken")
+		else AssetLib.get_or_build("base_trophy", _build_trophy_tex), Vector2(508, 296))
 	add_hotspot({
 		"name": "Plastic Trophy",
 		"pos": Vector2(508, 292),
 		"size": Vector2(34, 44),
 		"on_look": _look_trophy,
 		"touch": _take_trophy,
-		"visual": trophy,
+		"visual": _trophy_sprite,
 		"interact": Vector2(508, 322),
 	})
 	# --- water heater
@@ -388,6 +393,8 @@ func _take_trophy() -> void:
 	if Inventory.add_item("plastic_trophy"):
 		UILayer.fly_item("plastic_trophy", Vector2(508, 284))
 		GameState.set_flag("basement_trophy_taken")
+		# the trophy leaves the stool; the stool begins its grieving period
+		_trophy_sprite.texture = AssetLib.get_or_build("base_stool_empty", _build_stool_tex)
 		say("A trophy for showing up. I did show up. Via trapdoor, but it counts.")
 
 
@@ -824,6 +831,16 @@ func _build_trophy_tex() -> Texture2D:
 	p.line(5, 4, 5, 7, gold)
 	p.line(13, 4, 13, 7, gold)
 	p.dot(7, 5, Color(1.0, 0.95, 0.7))
+	return p.tex()
+
+
+func _build_stool_tex() -> Texture2D:
+	var p: Painter = AssetLib.painter(18, 24, 2)
+	# the stool alone, plus the dust ring where the trophy stood
+	p.rect(3, 16, 12, 2, Color(0.45, 0.32, 0.18))
+	p.vline(4, 18, 6, Color(0.35, 0.24, 0.13))
+	p.vline(13, 18, 6, Color(0.35, 0.24, 0.13))
+	p.ellipse_outline(9, 16, 4, 1, Color(0.55, 0.42, 0.28))
 	return p.tex()
 
 

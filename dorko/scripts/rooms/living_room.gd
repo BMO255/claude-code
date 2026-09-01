@@ -110,38 +110,38 @@ func _build_walls() -> void:
 
 
 func _build_rug() -> void:
-	# shifted right of center so the foreground TV doesn't sit on the secret
+	# back in the center of the floor, where suspicious rugs belong
 	_rug_sprite = Sprite2D.new()
 	_rug_sprite.texture = AssetLib.get_or_build("living_rug", _build_rug_tex)
-	_rug_sprite.position = Vector2(365, 306)
+	_rug_sprite.position = Vector2(330, 308)
 	_rug_sprite.z_index = -450
 	bg.add_child(_rug_sprite)
 	_rug_hs = add_hotspot({
 		"name": "Rug",
-		"pos": Vector2(365, 306),
+		"pos": Vector2(330, 308),
 		"size": Vector2(120, 42),
 		"look": "There's a draft coming up through it. Rugs shouldn't breathe.",
 		"touch": _touch_rug,
 		"visual": _rug_sprite,
-		"interact": Vector2(365, 332),
+		"interact": Vector2(330, 334),
 	})
 
 
 func _build_tv() -> void:
-	# The TV sits in the FOREGROUND, planted right in front of the couch guy,
-	# screen toward the camera (he watches it; we watch it over its shoulder).
-	# Its ground line (y=356) keeps it drawn in front of him (his z is ~272).
-	var stand := add_prop(AssetLib.get_or_build("living_tv_stand", _build_stand_tex), Vector2(230, 312))
+	# The TV stands due NORTH of the couch guy: against the back wall, right
+	# behind the couch, its top half (marquee + screen) peeking over the couch
+	# back. He stares straight up-screen at it; so do we.
+	var stand := add_prop(AssetLib.get_or_build("living_tv_stand", _build_stand_tex), Vector2(330, 164))
 	_tv = TvScreen.new()
-	# stand sprite is 112x88 centered at (230,312): top-left (174,268); the
+	# stand sprite is 112x88 centered at (330,164): top-left (274,120); the
 	# CRT's inner screen rect starts 6px in from that and is exactly 88x40.
-	_tv.position = Vector2(180, 274)
-	_tv.z_index = 357  # one over the stand's ground-line z
+	_tv.position = Vector2(280, 126)
+	_tv.z_index = 209  # one over the stand's ground-line z; behind the couch
 	add_child(_tv)
 	_tv_sub = Label.new()
 	_tv_sub.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART  # before size, so it wraps
-	_tv_sub.position = Vector2(130, 318)
-	_tv_sub.size = Vector2(200, 26)
+	_tv_sub.position = Vector2(230, 170)
+	_tv_sub.size = Vector2(200, 24)
 	_tv_sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_tv_sub.add_theme_font_size_override("font_size", 8)
 	_tv_sub.add_theme_color_override("font_color", Color(1.0, 0.95, 0.4))
@@ -152,25 +152,27 @@ func _build_tv() -> void:
 	add_child(_tv_sub)
 	add_hotspot({
 		"name": "TV",
-		"pos": Vector2(230, 296),
-		"size": Vector2(104, 84),
+		"pos": Vector2(330, 156),
+		"size": Vector2(104, 76),
 		"look": [
 			"Wood-paneled. The wood is a sticker. The panel is also, somehow, a sticker.",
 			"It only gets one channel, and the channel is wrong.",
 		],
 		"touch": _touch_tv,
 		"visual": stand,
-		"interact": Vector2(304, 334),
+		"interact": Vector2(250, 296),
 	})
-	# Ultra Cube 64 on the stand's shelf
+	# Ultra Cube 64 on the floor beside the couch, wired up toward the TV
+	var cube := add_prop(AssetLib.get_or_build("living_ultracube", _build_cube_tex), Vector2(218, 268))
 	add_hotspot({
 		"name": "Ultra Cube 64",
-		"pos": Vector2(230, 340),
-		"size": Vector2(56, 26),
+		"pos": Vector2(218, 264),
+		"size": Vector2(52, 30),
 		"look": "The cartridge slot is breathing.",
 		"touch": func(): say("I pressed the power button. The button and I both understood nothing would happen."),
 		"use_item": _use_on_cube,
-		"interact": Vector2(304, 334),
+		"visual": cube,
+		"interact": Vector2(218, 298),
 	})
 
 
@@ -402,7 +404,7 @@ func _fall_through() -> void:
 	AudioBus.play_sfx("fall_whistle")
 	var tw := create_tween()
 	tw.set_parallel(true)
-	tw.tween_property(dorko, "position", Vector2(365, 306), 0.55).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	tw.tween_property(dorko, "position", Vector2(330, 308), 0.55).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
 	tw.tween_property(dorko, "rotation", TAU * 1.5, 0.9)
 	tw.tween_property(dorko, "scale", Vector2(0.1, 0.1), 0.9).set_ease(Tween.EASE_IN)
 	await tw.finished
@@ -487,16 +489,10 @@ func _build_stand_tex() -> Texture2D:
 	p.hline(2, 26, 52, Color(0.58, 0.38, 0.18))
 	for i in 5:
 		p.vline(6 + i * 11, 28, 12, Color(0.35, 0.2, 0.09))
-	# Ultra Cube 64 on the shelf: grey trapezoid, four ports, a slot that breathes
-	p.poly(PackedVector2Array([
-		Vector2(14, 40), Vector2(42, 40), Vector2(38, 32), Vector2(18, 32),
-	]), Color(0.55, 0.55, 0.6))
-	p.hline(18, 32, 20, Color(0.7, 0.7, 0.75))
-	p.hline(21, 34, 14, Color(0.3, 0.3, 0.35))  # the slot
-	p.dot(20, 38, Color(0.9, 0.2, 0.2))
-	p.dot(25, 38, Color(0.95, 0.85, 0.2))
-	p.dot(30, 38, Color(0.2, 0.7, 0.3))
-	p.dot(35, 38, Color(0.25, 0.4, 0.9))
+	# the shelf: empty except for the dust shadow where a console used to sit
+	# (the Ultra Cube lives on the floor by the couch now)
+	p.rect(16, 36, 24, 4, Color(0.38, 0.23, 0.1))
+	p.hline(16, 36, 24, Color(0.46, 0.29, 0.13))
 	# CRT above (the screen itself is the TvScreen node)
 	p.rect(0, 0, 56, 26, Color(0.4, 0.26, 0.13))
 	p.rect_outline(0, 0, 56, 26, Color(0.22, 0.13, 0.06))
@@ -528,6 +524,22 @@ func _build_couch_tex() -> Texture2D:
 		p.dot(f[0], f[1] - 1, Color(0.62, 0.42, 0.24))
 	# the permanent depression where he sits
 	p.ellipse(44, 24, 17, 6, Color(0.3, 0.19, 0.1))
+	return p.tex()
+
+
+func _build_cube_tex() -> Texture2D:
+	var p: Painter = AssetLib.painter(24, 15, 2)
+	# grey trapezoid, four colorful controller ports, a cartridge slot
+	p.poly(PackedVector2Array([
+		Vector2(1, 13), Vector2(23, 13), Vector2(20, 3), Vector2(4, 3),
+	]), Color(0.55, 0.55, 0.6))
+	p.hline(4, 3, 16, Color(0.7, 0.7, 0.75))
+	p.hline(7, 5, 10, Color(0.3, 0.3, 0.35))   # the slot. it breathes.
+	p.dot(5, 10, Color(0.9, 0.2, 0.2))
+	p.dot(10, 10, Color(0.95, 0.85, 0.2))
+	p.dot(14, 10, Color(0.2, 0.7, 0.3))
+	p.dot(19, 10, Color(0.25, 0.4, 0.9))
+	p.hline(1, 14, 22, Color(0.35, 0.35, 0.4))
 	return p.tex()
 
 
